@@ -113,6 +113,7 @@ class PreviewServiceProvider extends ServiceProvider
             return new FixtureWriter(
                 config('preview.fixture_path'),
                 $this->app->make(RedactionPolicy::class),
+                $this->app->make(GitIgnoreGuard::class),
             );
         });
 

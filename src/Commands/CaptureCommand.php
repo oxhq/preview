@@ -67,6 +67,12 @@ final class CaptureCommand extends Command
         $transportName = (string) $this->option('transport');
 
         if ($transportName !== '' && ! $this->hasSyntheticRequestData()) {
+            if (! (bool) $this->option('live')) {
+                $this->error('Live tunnel capture requires --live and preview.live_enabled=true.');
+
+                return self::FAILURE;
+            }
+
             return $this->openTunnel($providerName, $transportName);
         }
 
@@ -121,10 +127,10 @@ final class CaptureCommand extends Command
         }
 
         try {
-            $captureUrl = rtrim($handle->publicUrl, '/').'/__preview/capture/'.rawurlencode($providerName);
+            $captureUrl = rtrim($handle->publicUrl, '/').$this->captureEndpointPath($providerName);
 
             if ($providerName === 'hmac') {
-                $captureUrl .= '?signature_header='.rawurlencode((string) $this->option('signature-header'));
+                $captureUrl .= (str_contains($captureUrl, '?') ? '&' : '?').'signature_header='.rawurlencode((string) $this->option('signature-header'));
             }
 
             $this->line("Capture URL: {$captureUrl}");
@@ -134,6 +140,20 @@ final class CaptureCommand extends Command
         } finally {
             $transport->close($handle);
         }
+    }
+
+    private function captureEndpointPath(string $providerName): string
+    {
+        $template = (string) config('preview.http_capture.path', '/__preview/capture/{provider}');
+        $provider = rawurlencode($providerName);
+
+        if (str_contains($template, '{provider}')) {
+            $path = str_replace('{provider}', $provider, $template);
+        } else {
+            $path = rtrim($template, '/').'/'.$provider;
+        }
+
+        return '/'.ltrim($path, '/');
     }
 
     private function holdTunnel(float $holdSeconds): void

@@ -29,7 +29,7 @@ final class GitIgnoreGuard
 
         $line = '/'.str_replace(DIRECTORY_SEPARATOR, '/', trim($relative, DIRECTORY_SEPARATOR)).'/';
         $prefix = $contents === '' || str_ends_with($contents, "\n") ? '' : PHP_EOL;
-        $entry = $prefix.'# Laravel Preview local captures'.PHP_EOL.$line.PHP_EOL;
+        $entry = $prefix.'# Laravel Preview local files'.PHP_EOL.$line.PHP_EOL;
 
         file_put_contents($gitignore, $entry, FILE_APPEND | LOCK_EX);
     }

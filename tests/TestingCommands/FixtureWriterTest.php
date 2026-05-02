@@ -43,6 +43,7 @@ final class FixtureWriterTest extends TestCase
 
         $headers = file_get_contents($root.'/fixtures/stripe/checkout-session-completed/headers.php');
         $fixture = file_get_contents($root.'/fixtures/stripe/checkout-session-completed/fixture.php');
+        $loaded = PreviewFixture::load($root.'/fixtures/stripe/checkout-session-completed/fixture.php');
 
         $this->assertStringNotContainsString('Authorization', (string) $headers);
         $this->assertStringNotContainsString('Cookie', (string) $headers);
@@ -50,6 +51,9 @@ final class FixtureWriterTest extends TestCase
         $this->assertStringContainsString('Stripe-Signature', (string) $headers);
         $this->assertStringContainsString("->signing('resign')", (string) $fixture);
         $this->assertStringContainsString('fixtureContext', (string) $fixture);
+        $this->assertFileDoesNotExist($root.'/fixtures/stripe/checkout-session-completed/payload.json');
+        $this->assertFileExists($root.'/fixtures/.local/stripe/checkout-session-completed/payload.json');
+        $this->assertSame('{"id":1}', $loaded->rawBody());
     }
 
     public function test_it_writes_hmac_fixture_context_without_shared_secret(): void
@@ -91,5 +95,87 @@ final class FixtureWriterTest extends TestCase
             'signature_header' => 'X-Custom-Signature',
             'algorithm' => 'sha256',
         ], PreviewFixture::load($root.'/fixtures/hmac/event-created/fixture.php')->fixtureContext());
+    }
+
+    public function test_it_keeps_payload_commit_ready_when_no_sensitive_headers_are_present(): void
+    {
+        $root = sys_get_temp_dir().'/preview-fixtures-'.bin2hex(random_bytes(4));
+        $body = $root.'/capture-body.raw';
+        mkdir($root, 0775, true);
+        file_put_contents($body, '{"id":1}');
+
+        $record = new CaptureRecord(
+            id: 'cap_generic',
+            provider: 'generic',
+            eventType: 'event.created',
+            method: 'POST',
+            path: '/webhook/generic',
+            query: [],
+            headers: ['X-Preview-Event' => 'event.created'],
+            rawBodyPath: $body,
+            capturedAt: new DateTimeImmutable(),
+            verified: true,
+            metadata: ['fixture_name' => 'event-created'],
+        );
+
+        $writer = new FixtureWriter($root.'/fixtures');
+        $writer->write($record);
+
+        $this->assertFileExists($root.'/fixtures/generic/event-created/payload.json');
+        $this->assertFileDoesNotExist($root.'/fixtures/.local/generic/event-created/payload.json');
+        $this->assertSame('{"id":1}', PreviewFixture::load($root.'/fixtures/generic/event-created/fixture.php')->rawBody());
+    }
+
+    public function test_it_gitignores_local_only_fixture_payloads_inside_git_roots(): void
+    {
+        $root = sys_get_temp_dir().'/preview-fixtures-git-'.bin2hex(random_bytes(4));
+        $body = $root.'/capture-body.raw';
+        mkdir($root.'/.git', 0775, true);
+        file_put_contents($root.'/.gitignore', "/vendor/\n");
+        file_put_contents($body, '{"id":1}');
+
+        $record = new CaptureRecord(
+            id: 'cap_sensitive',
+            provider: 'generic',
+            eventType: 'event.created',
+            method: 'POST',
+            path: '/webhook/generic',
+            query: [],
+            headers: ['Authorization' => 'Bearer secret'],
+            rawBodyPath: $body,
+            capturedAt: new DateTimeImmutable(),
+            verified: true,
+            metadata: ['fixture_name' => 'event-created'],
+        );
+
+        try {
+            $writer = new FixtureWriter($root.'/tests/Fixtures/Preview');
+            $writer->write($record);
+
+            $gitignore = str_replace("\r\n", "\n", (string) file_get_contents($root.'/.gitignore'));
+
+            $this->assertStringContainsString("/tests/Fixtures/Preview/.local/\n", $gitignore);
+            $this->assertFileExists($root.'/tests/Fixtures/Preview/.local/generic/event-created/payload.json');
+        } finally {
+            $this->removeDirectory($root);
+        }
+    }
+
+    private function removeDirectory(string $path): void
+    {
+        if (! is_dir($path)) {
+            return;
+        }
+
+        $items = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($items as $item) {
+            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+        }
+
+        rmdir($path);
     }
 }
