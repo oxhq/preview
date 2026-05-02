@@ -162,6 +162,8 @@ Without `--send-to`, replay remains summary-only and prints the payload shape. W
 
 Providers describe how captured traffic is understood.
 
+Provider expansion guidance lives in `docs/preview/provider-contribution-guide.md`, and current versus candidate capability status lives in `docs/preview/provider-capability-matrix.md`. Candidate providers are not supported until implemented and verified.
+
 ```php
 interface PreviewProvider
 {
@@ -175,6 +177,9 @@ interface PreviewProvider
     public function eventType(PreviewRequest $request): ?string;
 
     public function fixtureName(PreviewRequest $request): string;
+
+    /** @return array<string, mixed> */
+    public function fixtureContext(PreviewRequest $request): array;
 
     public function canSign(): bool;
 

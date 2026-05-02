@@ -48,11 +48,11 @@ Build providers only when users ask for them by name or a real integration needs
 
 Add:
 
-- provider contribution guide
+- provider contribution guide (`docs/preview/provider-contribution-guide.md`)
 - provider test contract
 - fixture naming conventions
 - signature verification examples
-- provider capability matrix
+- provider capability matrix (`docs/preview/provider-capability-matrix.md`)
 
 Do not add:
 
@@ -171,4 +171,3 @@ Stop or rethink if:
 - provider support becomes a pile of one-off special cases
 - route preview competes only with Valet/Herd/Expose sharing
 - scenarios require too much ceremony before users have repeated flows worth saving
-
