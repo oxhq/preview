@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Capture;
 
 use Oxhq\Preview\Core\ProviderRegistry;
+use Oxhq\Preview\Providers\GenericHmacProvider;
+use Oxhq\Preview\Providers\PreviewProvider;
 use RuntimeException;
 
 final class ReplayService
@@ -31,7 +33,7 @@ final class ReplayService
     public function resign(string|CaptureRecord $capture): array
     {
         $record = is_string($capture) ? $this->captures->find($capture) : $capture;
-        $provider = $this->providers->get($record->provider);
+        $provider = $this->providerForResign($record);
 
         if (! $provider->canSign()) {
             throw new RuntimeException("Provider [{$record->provider}] cannot re-sign captures. Use --exact instead.");
@@ -73,5 +75,41 @@ final class ReplayService
             'raw_body' => $record->rawBody(),
             'captured_at' => $record->capturedAt->format(DATE_ATOM),
         ];
+    }
+
+    private function providerForResign(CaptureRecord $record): PreviewProvider
+    {
+        $context = $record->metadata['fixture_context'] ?? [];
+
+        if ($record->provider === 'hmac' && is_array($context) && isset($context['signature_header']) && is_string($context['signature_header'])) {
+            return new GenericHmacProvider(
+                $context['signature_header'],
+                (string) $this->configValue('preview.hmac.secret', 'preview-secret'),
+                isset($context['algorithm']) && is_string($context['algorithm'])
+                    ? $context['algorithm']
+                    : (string) $this->configValue('preview.hmac.algorithm', 'sha256'),
+            );
+        }
+
+        return $this->providers->get($record->provider);
+    }
+
+    private function configValue(string $key, mixed $default): mixed
+    {
+        if (! function_exists('app') || ! function_exists('config')) {
+            return $default;
+        }
+
+        try {
+            $app = app();
+
+            if (method_exists($app, 'bound') && $app->bound('config')) {
+                return config($key, $default);
+            }
+        } catch (\Throwable) {
+            return $default;
+        }
+
+        return $default;
     }
 }

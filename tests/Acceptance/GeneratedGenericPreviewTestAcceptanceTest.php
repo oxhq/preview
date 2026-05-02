@@ -11,30 +11,6 @@ namespace Oxhq\Preview\Tests\Acceptance {
     use Oxhq\Preview\Testing\PreviewFixture;
     use Oxhq\Preview\Tests\TestCase;
 
-    final class GeneratedPestTestRegistry
-    {
-        private static ?Closure $test = null;
-
-        public static function reset(): void
-        {
-            self::$test = null;
-        }
-
-        public static function register(string $description, Closure $test): void
-        {
-            self::$test = $test;
-        }
-
-        public static function test(): Closure
-        {
-            if (self::$test === null) {
-                throw new \RuntimeException('Generated Pest test was not registered.');
-            }
-
-            return self::$test;
-        }
-    }
-
     final class GeneratedGenericPreviewTestAcceptanceTest extends TestCase
     {
         public function test_generated_generic_fixture_and_pest_test_can_be_loaded_and_executed(): void

@@ -255,7 +255,21 @@ final class PreviewFixture
 
     private function configValue(string $key, mixed $default): mixed
     {
-        return function_exists('config') ? config($key, $default) : $default;
+        if (! function_exists('app') || ! function_exists('config')) {
+            return $default;
+        }
+
+        try {
+            $app = app();
+
+            if (method_exists($app, 'bound') && $app->bound('config')) {
+                return config($key, $default);
+            }
+        } catch (\Throwable) {
+            return $default;
+        }
+
+        return $default;
     }
 
     private static function fromConfiguredPath(string $provider, string $name): self
