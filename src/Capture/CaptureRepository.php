@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Capture;
 
 use Oxhq\Preview\Core\CaptureId;
+use Oxhq\Preview\Core\GitIgnoreGuard;
 use Oxhq\Preview\Core\RedactionPolicy;
 use Oxhq\Preview\Providers\PreviewProvider;
 use RuntimeException;
@@ -15,6 +16,7 @@ final class CaptureRepository
         private readonly ?string $storagePath = null,
         private readonly ?RedactionPolicy $redactionPolicy = null,
         private readonly ?CaptureId $captureId = null,
+        private readonly ?GitIgnoreGuard $gitIgnoreGuard = null,
     ) {
     }
 
@@ -26,6 +28,7 @@ final class CaptureRepository
         $directory = $this->captureDirectory($id);
         $rawBodyPath = $directory.DIRECTORY_SEPARATOR.'body.raw';
 
+        $this->gitIgnoreGuard()->ensureIgnored($this->storageRoot());
         $this->ensureDirectory($directory);
         file_put_contents($rawBodyPath, $request->rawBody);
 
@@ -112,6 +115,11 @@ final class CaptureRepository
         }
 
         return gmdate('YmdHis').'-'.bin2hex(random_bytes(5));
+    }
+
+    private function gitIgnoreGuard(): GitIgnoreGuard
+    {
+        return $this->gitIgnoreGuard ?? new GitIgnoreGuard();
     }
 
     private function metadataPath(string $id): string

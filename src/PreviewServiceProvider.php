@@ -16,6 +16,7 @@ use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\ReplayService;
 use Oxhq\Preview\Core\CaptureId;
+use Oxhq\Preview\Core\GitIgnoreGuard;
 use Oxhq\Preview\Core\ProviderRegistry;
 use Oxhq\Preview\Core\RedactionPolicy;
 use Oxhq\Preview\Core\Transport\CloudflareTunnelTransport;
@@ -36,6 +37,7 @@ class PreviewServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/preview.php', 'preview');
 
         $this->app->singleton(CaptureId::class);
+        $this->app->singleton(GitIgnoreGuard::class);
 
         $this->app->singleton(RedactionPolicy::class, function (): RedactionPolicy {
             return new RedactionPolicy(config('preview.redact_headers', []));
@@ -94,6 +96,7 @@ class PreviewServiceProvider extends ServiceProvider
                 config('preview.storage_path'),
                 $this->app->make(RedactionPolicy::class),
                 $this->app->make(CaptureId::class),
+                $this->app->make(GitIgnoreGuard::class),
             );
         });
 

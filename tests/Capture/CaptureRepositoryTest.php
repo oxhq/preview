@@ -27,4 +27,67 @@ final class CaptureRepositoryTest extends TestCase
         $this->assertSame('Order Created', $repository->find($record->id)->eventType);
         $this->assertCount(1, $repository->all());
     }
+
+    public function test_it_appends_gitignore_rule_for_capture_storage_inside_git_root(): void
+    {
+        $root = sys_get_temp_dir().'/preview-git-root-'.bin2hex(random_bytes(4));
+        mkdir($root.'/.git', 0775, true);
+        file_put_contents($root.'/.gitignore', "/vendor/\n");
+
+        $repository = new CaptureRepository($root.'/storage/framework/preview/captures');
+
+        try {
+            $repository->store(
+                PreviewRequest::make('generic', 'post', '/webhooks/orders', [], [], '{"id":1}'),
+                new GenericProvider(),
+            );
+
+            $contents = str_replace("\r\n", "\n", (string) file_get_contents($root.'/.gitignore'));
+
+            $this->assertStringContainsString("/storage/framework/preview/captures/\n", $contents);
+        } finally {
+            $this->removeDirectory($root);
+        }
+    }
+
+    public function test_it_does_not_append_gitignore_rule_when_parent_path_is_already_ignored(): void
+    {
+        $root = sys_get_temp_dir().'/preview-git-root-'.bin2hex(random_bytes(4));
+        mkdir($root.'/.git', 0775, true);
+        file_put_contents($root.'/.gitignore', "/storage/framework/preview/\n");
+
+        $repository = new CaptureRepository($root.'/storage/framework/preview/captures');
+
+        try {
+            $repository->store(
+                PreviewRequest::make('generic', 'post', '/webhooks/orders', [], [], '{"id":1}'),
+                new GenericProvider(),
+            );
+
+            $this->assertSame(
+                "/storage/framework/preview/\n",
+                (string) file_get_contents($root.'/.gitignore'),
+            );
+        } finally {
+            $this->removeDirectory($root);
+        }
+    }
+
+    private function removeDirectory(string $path): void
+    {
+        if (! is_dir($path)) {
+            return;
+        }
+
+        $items = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($items as $item) {
+            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+        }
+
+        rmdir($path);
+    }
 }
