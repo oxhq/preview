@@ -120,6 +120,13 @@ Provider-specific transports are allowed as optional convenience adapters. For e
 
 The v0.1 transport registry exposes `cloudflare` and `ngrok` adapters. This is package-level proof until real binaries, account state, and live tunnel startup are verified on a developer machine.
 
+Windows installs may place tunnel binaries outside PATH. The package supports explicit binary configuration:
+
+```env
+PREVIEW_CLOUDFLARED_BINARY="C:\Program Files (x86)\cloudflared\cloudflared.exe"
+PREVIEW_NGROK_BINARY="C:\Tools\ngrok.exe"
+```
+
 ## Capture Module
 
 `Preview\Capture` is the v0.1 center of gravity.

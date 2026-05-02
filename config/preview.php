@@ -33,6 +33,11 @@ return [
         'stripe-cli' => null,
     ],
 
+    'transport_binaries' => [
+        'cloudflare' => env('PREVIEW_CLOUDFLARED_BINARY', 'cloudflared'),
+        'ngrok' => env('PREVIEW_NGROK_BINARY', 'ngrok'),
+    ],
+
     'live_enabled' => env('PREVIEW_LIVE_ENABLED', false),
 
     'hmac' => [

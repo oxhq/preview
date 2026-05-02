@@ -74,8 +74,17 @@ class PreviewServiceProvider extends ServiceProvider
             return $registry;
         });
 
-        $this->app->bind(CloudflareTunnelTransport::class);
-        $this->app->bind(NgrokTunnelTransport::class);
+        $this->app->bind(CloudflareTunnelTransport::class, function (): CloudflareTunnelTransport {
+            return new CloudflareTunnelTransport(
+                binary: (string) config('preview.transport_binaries.cloudflare', 'cloudflared'),
+            );
+        });
+
+        $this->app->bind(NgrokTunnelTransport::class, function (): NgrokTunnelTransport {
+            return new NgrokTunnelTransport(
+                binary: (string) config('preview.transport_binaries.ngrok', 'ngrok'),
+            );
+        });
 
         $this->app->singleton(CaptureRepository::class, function (): CaptureRepository {
             return new CaptureRepository(
