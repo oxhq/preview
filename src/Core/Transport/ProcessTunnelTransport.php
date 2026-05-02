@@ -55,7 +55,14 @@ abstract class ProcessTunnelTransport implements TunnelTransport
 
         $timeout = rtrim(rtrim(sprintf('%.3F', $this->urlTimeoutSeconds), '0'), '.');
 
-        throw new RuntimeException("Unable to detect public tunnel URL for [{$this->name()}] within {$timeout} seconds.");
+        $message = "Unable to detect public tunnel URL for [{$this->name()}] within {$timeout} seconds.";
+        $excerpt = trim($output);
+
+        if ($excerpt !== '') {
+            $message .= ' Last output: '.$this->excerpt($excerpt);
+        }
+
+        throw new RuntimeException($message);
     }
 
     public function close(TunnelHandle $handle): void
@@ -73,4 +80,11 @@ abstract class ProcessTunnelTransport implements TunnelTransport
     abstract protected function parsePublicUrl(string $output): ?string;
 
     abstract protected function name(): string;
+
+    private function excerpt(string $output): string
+    {
+        $output = preg_replace('/\s+/', ' ', $output) ?? $output;
+
+        return mb_substr($output, 0, 500);
+    }
 }

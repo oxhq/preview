@@ -25,7 +25,9 @@ final class CaptureCommand extends Command
         {--signature-header= : Required for hmac provider captures}
         {--live : Require preview.live_enabled before allowing live capture}
         {--transport= : Tunnel transport to expose the local capture endpoint}
-        {--local-url=http://127.0.0.1:8000 : Local application URL for tunnel transports}';
+        {--local-url=http://127.0.0.1:8000 : Local application URL for tunnel transports}
+        {--wait : Keep the tunnel open until Enter is pressed}
+        {--hold-seconds=0 : Keep the tunnel open for a bounded number of seconds}';
 
     protected $description = 'Create a local v0.1 Preview capture from CLI-supplied request data.';
 
@@ -101,6 +103,14 @@ final class CaptureCommand extends Command
 
     private function openTunnel(string $providerName, string $transportName): int
     {
+        $holdSeconds = (float) $this->option('hold-seconds');
+
+        if ($holdSeconds < 0) {
+            $this->error('The --hold-seconds option must be zero or greater.');
+
+            return self::FAILURE;
+        }
+
         try {
             $transport = $this->transports->get($transportName);
             $handle = $transport->open((string) $this->option('local-url'));
@@ -114,10 +124,25 @@ final class CaptureCommand extends Command
             $captureUrl = rtrim($handle->publicUrl, '/').'/__preview/capture/'.rawurlencode($providerName);
 
             $this->line("Capture URL: {$captureUrl}");
+            $this->holdTunnel($holdSeconds);
 
             return self::SUCCESS;
         } finally {
             $transport->close($handle);
+        }
+    }
+
+    private function holdTunnel(float $holdSeconds): void
+    {
+        if ((bool) $this->option('wait')) {
+            $this->line('Tunnel is open. Press Enter to close it.');
+            fgets(STDIN);
+
+            return;
+        }
+
+        if ($holdSeconds > 0) {
+            usleep((int) round($holdSeconds * 1_000_000));
         }
     }
 

@@ -84,6 +84,17 @@ final class CaptureCommandsTest extends TestCase
             ->assertExitCode(1);
     }
 
+    public function test_capture_command_rejects_negative_tunnel_hold_seconds(): void
+    {
+        $this->artisan('preview:capture', [
+            'provider' => 'generic',
+            '--transport' => 'cloudflare',
+            '--hold-seconds' => '-1',
+        ])
+            ->expectsOutput('The --hold-seconds option must be zero or greater.')
+            ->assertExitCode(1);
+    }
+
     public function test_capture_list_show_replay_fixture_and_test_commands_work_together(): void
     {
         $this->artisan('preview:capture', [

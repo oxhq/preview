@@ -277,6 +277,8 @@ php artisan preview:capture generic
 php artisan preview:capture hmac --signature-header=X-Signature
 php artisan preview:capture stripe
 php artisan preview:capture generic --transport=cloudflare --local-url=http://127.0.0.1:8000
+php artisan preview:capture generic --transport=cloudflare --local-url=http://127.0.0.1:8000 --wait
+php artisan preview:capture generic --transport=cloudflare --local-url=http://127.0.0.1:8000 --hold-seconds=60
 
 php artisan preview:capture:list
 php artisan preview:capture:show {capture}
@@ -304,6 +306,8 @@ Inbound capture endpoint:
 ```
 
 The endpoint accepts common HTTP methods, stores a local capture, and returns safe JSON metadata only. It does not return raw body or captured headers. If `X-Preview-Original-Path` is present, that value is stored as the captured application path; otherwise the package route path is stored.
+
+Tunnel capture defaults to open-print-close so automated checks do not hang. Use `--wait` for an interactive session that stays open until Enter, or `--hold-seconds` for a bounded smoke/demo window.
 
 ## v0.1 Success Criteria
 

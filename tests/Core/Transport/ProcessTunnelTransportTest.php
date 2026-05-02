@@ -54,6 +54,7 @@ final class ProcessTunnelTransportTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Unable to detect public tunnel URL for [cloudflare]');
+        $this->expectExceptionMessage('starting tunnel without url');
 
         $transport->open('http://localhost:8000');
     }
