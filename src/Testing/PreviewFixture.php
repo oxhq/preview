@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Testing;
 
 use Oxhq\Preview\Core\ProviderRegistry;
+use Oxhq\Preview\Providers\GenericHmacProvider;
+use Oxhq\Preview\Providers\PreviewProvider;
 use RuntimeException;
 
 final class PreviewFixture
@@ -24,6 +26,9 @@ final class PreviewFixture
     private string $signingMode = 'exact';
 
     private int $expectedStatus = 200;
+
+    /** @var array<string, mixed> */
+    private array $fixtureContext = [];
 
     public static function load(string $path): self
     {
@@ -104,6 +109,21 @@ final class PreviewFixture
         return $this;
     }
 
+    /**
+     * @param array<string, mixed>|null $context
+     * @return self|array<string, mixed>
+     */
+    public function fixtureContext(?array $context = null): self|array
+    {
+        if ($context !== null) {
+            $this->fixtureContext = $context;
+
+            return $this;
+        }
+
+        return $this->fixtureContext;
+    }
+
     public function assertsOk(): self
     {
         $this->expectedStatus = 200;
@@ -147,7 +167,7 @@ final class PreviewFixture
     public function freshSignedHeaders(?ProviderRegistry $registry = null): array
     {
         $registry ??= $this->resolveProviderRegistry();
-        $provider = $registry->get($this->provider);
+        $provider = $this->providerForSigning($registry);
 
         if (! $provider->canSign()) {
             throw new RuntimeException("Provider [{$this->provider}] cannot create fresh signed headers.");
@@ -216,6 +236,26 @@ final class PreviewFixture
         }
 
         return app(ProviderRegistry::class);
+    }
+
+    private function providerForSigning(ProviderRegistry $registry): PreviewProvider
+    {
+        if ($this->provider === 'hmac' && isset($this->fixtureContext['signature_header']) && is_string($this->fixtureContext['signature_header'])) {
+            return new GenericHmacProvider(
+                $this->fixtureContext['signature_header'],
+                (string) $this->configValue('preview.hmac.secret', 'preview-secret'),
+                isset($this->fixtureContext['algorithm']) && is_string($this->fixtureContext['algorithm'])
+                    ? $this->fixtureContext['algorithm']
+                    : (string) $this->configValue('preview.hmac.algorithm', 'sha256'),
+            );
+        }
+
+        return $registry->get($this->provider);
+    }
+
+    private function configValue(string $key, mixed $default): mixed
+    {
+        return function_exists('config') ? config($key, $default) : $default;
     }
 
     private static function fromConfiguredPath(string $provider, string $name): self

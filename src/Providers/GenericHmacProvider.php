@@ -49,6 +49,14 @@ class GenericHmacProvider extends GenericProvider
         return VerificationResult::verified();
     }
 
+    public function fixtureContext(PreviewRequest $request): array
+    {
+        return [
+            'signature_header' => $this->signatureHeaderName,
+            'algorithm' => $this->algorithm,
+        ];
+    }
+
     public function canSign(): bool
     {
         return true;

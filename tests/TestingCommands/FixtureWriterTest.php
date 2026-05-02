@@ -7,6 +7,7 @@ namespace Oxhq\Preview\Tests\TestingCommands;
 use DateTimeImmutable;
 use Oxhq\Preview\Capture\CaptureRecord;
 use Oxhq\Preview\Testing\FixtureWriter;
+use Oxhq\Preview\Testing\PreviewFixture;
 use PHPUnit\Framework\TestCase;
 
 final class FixtureWriterTest extends TestCase
@@ -48,5 +49,47 @@ final class FixtureWriterTest extends TestCase
         $this->assertStringNotContainsString('Set-Cookie', (string) $headers);
         $this->assertStringContainsString('Stripe-Signature', (string) $headers);
         $this->assertStringContainsString("->signing('resign')", (string) $fixture);
+        $this->assertStringContainsString('fixtureContext', (string) $fixture);
+    }
+
+    public function test_it_writes_hmac_fixture_context_without_shared_secret(): void
+    {
+        $root = sys_get_temp_dir().'/preview-fixtures-'.bin2hex(random_bytes(4));
+        $body = $root.'/capture-body.raw';
+        mkdir($root, 0775, true);
+        file_put_contents($body, '{"id":1}');
+
+        $record = new CaptureRecord(
+            id: 'cap_hmac',
+            provider: 'hmac',
+            eventType: 'event.created',
+            method: 'POST',
+            path: '/webhook/hmac',
+            query: [],
+            headers: ['X-Custom-Signature' => 'old'],
+            rawBodyPath: $body,
+            capturedAt: new DateTimeImmutable(),
+            verified: true,
+            metadata: [
+                'fixture_name' => 'event-created',
+                'fixture_context' => [
+                    'signature_header' => 'X-Custom-Signature',
+                    'algorithm' => 'sha256',
+                ],
+            ],
+        );
+
+        $writer = new FixtureWriter($root.'/fixtures');
+        $writer->write($record, providerCanSign: true);
+
+        $fixture = file_get_contents($root.'/fixtures/hmac/event-created/fixture.php');
+
+        $this->assertStringContainsString("'signature_header' => 'X-Custom-Signature'", (string) $fixture);
+        $this->assertStringContainsString("'algorithm' => 'sha256'", (string) $fixture);
+        $this->assertStringNotContainsString('secret', (string) $fixture);
+        $this->assertSame([
+            'signature_header' => 'X-Custom-Signature',
+            'algorithm' => 'sha256',
+        ], PreviewFixture::load($root.'/fixtures/hmac/event-created/fixture.php')->fixtureContext());
     }
 }

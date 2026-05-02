@@ -48,6 +48,7 @@ final class CaptureRepository
             verificationMessage: $request->verificationMessage,
             metadata: [
                 'fixture_name' => $provider->fixtureName($request),
+                'fixture_context' => $provider->fixtureContext($request),
             ],
             rawHeadersPath: $rawHeadersPath,
         );

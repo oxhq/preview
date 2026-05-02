@@ -37,6 +37,11 @@ class GenericProvider implements PreviewProvider
         return $this->slug($this->eventType($request) ?? 'generic-capture');
     }
 
+    public function fixtureContext(PreviewRequest $request): array
+    {
+        return [];
+    }
+
     public function canSign(): bool
     {
         return false;

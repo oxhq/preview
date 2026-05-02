@@ -7,6 +7,7 @@ namespace Oxhq\Preview\Tests\Capture;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\PreviewRequest;
 use Oxhq\Preview\Core\RedactionPolicy;
+use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -26,6 +27,7 @@ final class CaptureRepositoryTest extends TestCase
         $this->assertFileExists($root.'/'.$record->id.'/metadata.json');
         $this->assertFileExists($root.'/'.$record->id.'/body.raw');
         $this->assertFileExists($root.'/'.$record->id.'/headers.raw.json');
+        $this->assertSame([], $record->metadata['fixture_context']);
         $this->assertSame('Order Created', $repository->find($record->id)->eventType);
         $this->assertCount(1, $repository->all());
     }
@@ -57,6 +59,22 @@ final class CaptureRepositoryTest extends TestCase
         $this->assertSame('[redacted]', $loaded->headers['Cookie']);
         $this->assertSame('Bearer secret', $loaded->rawHeaders()['Authorization']);
         $this->assertSame('session=secret', $loaded->rawHeaders()['Cookie']);
+    }
+
+    public function test_it_stores_provider_fixture_context_in_capture_metadata(): void
+    {
+        $root = sys_get_temp_dir().'/preview-captures-'.bin2hex(random_bytes(4));
+        $repository = new CaptureRepository($root);
+
+        $record = $repository->store(
+            PreviewRequest::make('hmac', 'post', '/webhooks/hmac', [], [], '{"id":1}'),
+            new GenericHmacProvider('X-Custom-Signature', 'secret', 'sha512'),
+        );
+
+        $this->assertSame([
+            'signature_header' => 'X-Custom-Signature',
+            'algorithm' => 'sha512',
+        ], $repository->find($record->id)->metadata['fixture_context']);
     }
 
     public function test_it_appends_gitignore_rule_for_capture_storage_inside_git_root(): void

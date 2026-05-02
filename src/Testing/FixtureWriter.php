@@ -42,6 +42,7 @@ final class FixtureWriter
 
         return "<?php\n\nuse Oxhq\\Preview\\Testing\\PreviewFixture;\n\nreturn PreviewFixture::provider(".$this->exportString($record->provider).")\n"
             ."    ->event(".$this->exportNullableString($record->eventType).")\n"
+            ."    ->fixtureContext(".$this->exportArray($this->fixtureContext($record)).")\n"
             ."    ->endpoint(".$this->exportString($record->path).")\n"
             ."    ->method(".$this->exportString($record->method).")\n"
             ."    ->rawBody(__DIR__.'/payload.json')\n"
@@ -57,6 +58,16 @@ final class FixtureWriter
             : ($record->eventType ?: $record->id);
 
         return $this->fixtureRoot().DIRECTORY_SEPARATOR.$this->safeSegment($record->provider).DIRECTORY_SEPARATOR.$this->safeSegment($fixtureName);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fixtureContext(CaptureRecord $record): array
+    {
+        $context = $record->metadata['fixture_context'] ?? [];
+
+        return is_array($context) ? $context : [];
     }
 
     private function fixtureRoot(): string

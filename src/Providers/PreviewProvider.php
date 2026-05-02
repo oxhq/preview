@@ -21,6 +21,11 @@ interface PreviewProvider
 
     public function fixtureName(PreviewRequest $request): string;
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function fixtureContext(PreviewRequest $request): array;
+
     public function canSign(): bool;
 
     /**

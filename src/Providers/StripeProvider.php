@@ -81,6 +81,11 @@ class StripeProvider implements PreviewProvider
         return 'stripe-' . str_replace('.', '-', $eventType);
     }
 
+    public function fixtureContext(PreviewRequest $request): array
+    {
+        return [];
+    }
+
     public function canSign(): bool
     {
         return true;

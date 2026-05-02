@@ -72,4 +72,20 @@ final class GenericHmacProviderTest extends TestCase
         $this->assertContains(ProviderCapability::VerifiesSignature, $provider->capabilities());
         $this->assertContains(ProviderCapability::ReSignsPayload, $provider->capabilities());
     }
+
+    public function test_it_exposes_non_secret_fixture_context(): void
+    {
+        $provider = new GenericHmacProvider('X-Custom-Signature', 'secret', 'sha512');
+
+        $context = $provider->fixtureContext(PreviewRequest::make(
+            provider: 'generic-hmac',
+            method: 'POST',
+            path: '/webhook',
+        ));
+
+        $this->assertSame([
+            'signature_header' => 'X-Custom-Signature',
+            'algorithm' => 'sha512',
+        ], $context);
+    }
 }
