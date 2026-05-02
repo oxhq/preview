@@ -22,7 +22,7 @@ final class ReplayService
     {
         $record = is_string($capture) ? $this->captures->find($capture) : $capture;
 
-        return $this->payload($record, $record->headers, 'exact');
+        return $this->payload($record, $record->rawHeaders(), 'exact');
     }
 
     /**
@@ -37,10 +37,8 @@ final class ReplayService
             throw new RuntimeException("Provider [{$record->provider}] cannot re-sign captures. Use --exact instead.");
         }
 
-        $headers = array_merge(
-            $record->headers,
-            $provider->sign($record->rawBody(), $record->headers),
-        );
+        $headers = $record->rawHeaders();
+        $headers = array_merge($headers, $provider->sign($record->rawBody(), $headers));
 
         return $this->payload($record, $headers, 'resign');
     }

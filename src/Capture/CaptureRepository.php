@@ -27,10 +27,12 @@ final class CaptureRepository
         $id = $this->newCaptureId();
         $directory = $this->captureDirectory($id);
         $rawBodyPath = $directory.DIRECTORY_SEPARATOR.'body.raw';
+        $rawHeadersPath = $directory.DIRECTORY_SEPARATOR.'headers.raw.json';
 
         $this->gitIgnoreGuard()->ensureIgnored($this->storageRoot());
         $this->ensureDirectory($directory);
         file_put_contents($rawBodyPath, $request->rawBody);
+        $this->writeJson($rawHeadersPath, $request->headers, "Capture [{$id}] raw headers could not be encoded.");
 
         $record = new CaptureRecord(
             id: $id,
@@ -47,15 +49,10 @@ final class CaptureRepository
             metadata: [
                 'fixture_name' => $provider->fixtureName($request),
             ],
+            rawHeadersPath: $rawHeadersPath,
         );
 
-        $encoded = json_encode($record->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-
-        if ($encoded === false) {
-            throw new RuntimeException("Capture [{$id}] metadata could not be encoded.");
-        }
-
-        file_put_contents($this->metadataPath($id), $encoded.PHP_EOL);
+        $this->writeJson($this->metadataPath($id), $record->toArray(), "Capture [{$id}] metadata could not be encoded.");
 
         return $record;
     }
@@ -201,6 +198,20 @@ final class CaptureRepository
         if (! is_dir($path) && ! mkdir($path, 0775, true) && ! is_dir($path)) {
             throw new RuntimeException("Directory [{$path}] could not be created.");
         }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function writeJson(string $path, array $data, string $errorMessage): void
+    {
+        $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        if ($encoded === false) {
+            throw new RuntimeException($errorMessage);
+        }
+
+        file_put_contents($path, $encoded.PHP_EOL);
     }
 
     private function safeSegment(string $value): string

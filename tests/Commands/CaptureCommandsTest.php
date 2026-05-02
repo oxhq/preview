@@ -171,7 +171,7 @@ final class CaptureCommandsTest extends TestCase
             'provider' => 'generic',
             '--path' => '/webhooks/orders',
             '--body' => '{"id":1}',
-            '--header' => ['X-Preview-Event: order.created'],
+            '--header' => ['X-Preview-Event: order.created', 'Authorization: Bearer exact-secret'],
         ])->assertExitCode(0);
 
         $record = app(CaptureRepository::class)->all()[0];
@@ -190,6 +190,10 @@ final class CaptureCommandsTest extends TestCase
         $this->assertSame('POST', $requests[0]['method']);
         $this->assertSame('{"id":1}', $requests[0]['body']);
         $this->assertContains('X-Preview-Event: order.created', $requests[0]['headers']);
+        $this->assertContains('Authorization: Bearer exact-secret', $requests[0]['headers']);
+
+        $record = app(CaptureRepository::class)->find($record->id);
+        $this->assertSame('[redacted]', $record->headers['Authorization']);
     }
 }
 

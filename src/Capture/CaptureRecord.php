@@ -27,6 +27,7 @@ final class CaptureRecord
         public readonly bool $verified,
         public readonly ?string $verificationMessage = null,
         public readonly array $metadata = [],
+        public readonly ?string $rawHeadersPath = null,
     ) {
     }
 
@@ -44,6 +45,25 @@ final class CaptureRecord
     /**
      * @return array<string, mixed>
      */
+    public function rawHeaders(): array
+    {
+        if ($this->rawHeadersPath === null) {
+            return $this->headers;
+        }
+
+        $json = @file_get_contents($this->rawHeadersPath);
+        $headers = $json === false ? null : json_decode($json, true);
+
+        if (! is_array($headers)) {
+            throw new RuntimeException("Raw headers for capture [{$this->id}] could not be read.");
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -55,6 +75,7 @@ final class CaptureRecord
             'query' => $this->query,
             'headers' => $this->headers,
             'raw_body_path' => $this->rawBodyPath,
+            'raw_headers_path' => $this->rawHeadersPath,
             'captured_at' => $this->capturedAt->format(DATE_ATOM),
             'verified' => $this->verified,
             'verification_message' => $this->verificationMessage,
@@ -80,6 +101,7 @@ final class CaptureRecord
             verified: (bool) $data['verified'],
             verificationMessage: isset($data['verification_message']) ? (string) $data['verification_message'] : null,
             metadata: is_array($data['metadata'] ?? null) ? $data['metadata'] : [],
+            rawHeadersPath: isset($data['raw_headers_path']) ? (string) $data['raw_headers_path'] : null,
         );
     }
 }

@@ -6,6 +6,7 @@ namespace Oxhq\Preview\Tests\Capture;
 
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\PreviewRequest;
+use Oxhq\Preview\Core\RedactionPolicy;
 use Oxhq\Preview\Providers\GenericProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -24,8 +25,38 @@ final class CaptureRepositoryTest extends TestCase
         $this->assertSame('{"id":1}', $record->rawBody());
         $this->assertFileExists($root.'/'.$record->id.'/metadata.json');
         $this->assertFileExists($root.'/'.$record->id.'/body.raw');
+        $this->assertFileExists($root.'/'.$record->id.'/headers.raw.json');
         $this->assertSame('Order Created', $repository->find($record->id)->eventType);
         $this->assertCount(1, $repository->all());
+    }
+
+    public function test_it_keeps_raw_headers_local_while_metadata_headers_are_redacted(): void
+    {
+        $root = sys_get_temp_dir().'/preview-captures-'.bin2hex(random_bytes(4));
+        $repository = new CaptureRepository($root, new RedactionPolicy(['authorization', 'cookie']));
+
+        $record = $repository->store(
+            PreviewRequest::make(
+                'generic',
+                'post',
+                '/webhooks/orders',
+                [],
+                [
+                    'Authorization' => 'Bearer secret',
+                    'Cookie' => 'session=secret',
+                    'X-Preview-Event' => 'Order Created',
+                ],
+                '{"id":1}',
+            ),
+            new GenericProvider(),
+        );
+
+        $loaded = $repository->find($record->id);
+
+        $this->assertSame('[redacted]', $loaded->headers['Authorization']);
+        $this->assertSame('[redacted]', $loaded->headers['Cookie']);
+        $this->assertSame('Bearer secret', $loaded->rawHeaders()['Authorization']);
+        $this->assertSame('session=secret', $loaded->rawHeaders()['Cookie']);
     }
 
     public function test_it_appends_gitignore_rule_for_capture_storage_inside_git_root(): void
