@@ -26,6 +26,7 @@ use Oxhq\Preview\Core\Transport\TunnelTransport;
 use Oxhq\Preview\Http\CaptureController;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
+use Oxhq\Preview\Providers\PreviewProvider;
 use Oxhq\Preview\Providers\StripeProvider;
 use Oxhq\Preview\Testing\FixtureWriter;
 use Oxhq\Preview\Testing\PestTestWriter;
@@ -56,6 +57,18 @@ class PreviewServiceProvider extends ServiceProvider
                 (string) config('preview.stripe.endpoint_secret', 'whsec_preview'),
                 (int) config('preview.stripe.tolerance', 300),
             ));
+
+            foreach ((array) config('preview.providers', []) as $providerClass) {
+                if (! is_string($providerClass) || $providerClass === '' || $this->isBuiltInProvider($providerClass)) {
+                    continue;
+                }
+
+                $provider = $this->app->make($providerClass);
+
+                if ($provider instanceof PreviewProvider) {
+                    $registry->register($provider);
+                }
+            }
 
             return $registry;
         });
@@ -149,5 +162,14 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureController::class,
             )->name('preview.capture');
         }
+    }
+
+    private function isBuiltInProvider(string $providerClass): bool
+    {
+        return in_array($providerClass, [
+            GenericProvider::class,
+            GenericHmacProvider::class,
+            StripeProvider::class,
+        ], true);
     }
 }

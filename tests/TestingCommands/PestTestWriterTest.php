@@ -39,5 +39,8 @@ final class PestTestWriterTest extends TestCase
 
         $this->assertStringContainsString('$fixture->freshSignedHeaders()', (string) $contents);
         $this->assertStringContainsString('PreviewFixture::load', (string) $contents);
+        $this->assertStringContainsString('__DIR__', (string) $contents);
+        $this->assertStringContainsString('/../../Fixtures/signed/event-created/fixture.php', str_replace('\\', '/', (string) $contents));
+        $this->assertStringNotContainsString(str_replace('\\', '/', $root), str_replace('\\', '/', (string) $contents));
     }
 }

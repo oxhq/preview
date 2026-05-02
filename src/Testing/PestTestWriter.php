@@ -26,12 +26,16 @@ final class PestTestWriter
 
         $path = $this->testFilePath($record);
         $this->ensureDirectory(dirname($path));
-        file_put_contents($path, $this->testPhp($record, $fixturePath, $providerCanSign));
+        file_put_contents($path, $this->testPhp(
+            $record,
+            $this->fixtureReferenceExpression($fixturePath, dirname($path)),
+            $providerCanSign,
+        ));
 
         return $path;
     }
 
-    private function testPhp(CaptureRecord $record, string $fixturePath, bool $providerCanSign): string
+    private function testPhp(CaptureRecord $record, string $fixtureReferenceExpression, bool $providerCanSign): string
     {
         $headersExpression = $providerCanSign ? '$fixture->freshSignedHeaders()' : '$fixture->headers()';
         $description = $record->eventType !== null
@@ -41,7 +45,7 @@ final class PestTestWriter
         return "<?php\n\nuse Oxhq\\Preview\\Testing\\PreviewFixture;\n\n"
             ."it(".$this->exportString($description).", function () {\n"
             ."    // Preconditions: the target app route, database state, fakes, and auth context must match this capture.\n"
-            ."    \$fixture = PreviewFixture::load(".$this->exportString($fixturePath).");\n"
+            ."    \$fixture = PreviewFixture::load({$fixtureReferenceExpression});\n"
             ."    \$headers = {$headersExpression};\n\n"
             ."    \$this->call(\n"
             ."        \$fixture->requestMethod(),\n"
@@ -75,6 +79,64 @@ final class PestTestWriter
         }
 
         return getcwd().DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'Feature';
+    }
+
+    private function fixtureReferenceExpression(string $fixturePath, string $testDirectory): string
+    {
+        $relative = $this->relativePath($testDirectory, $fixturePath);
+
+        if ($relative === null) {
+            return $this->exportString($fixturePath);
+        }
+
+        return '__DIR__.'.$this->exportString('/'.$relative);
+    }
+
+    private function relativePath(string $fromDirectory, string $toPath): ?string
+    {
+        $from = $this->absolutePath($fromDirectory);
+        $to = $this->absolutePath($toPath);
+        $fromParts = $this->pathParts($from);
+        $toParts = $this->pathParts($to);
+
+        if ($fromParts === [] || $toParts === [] || strcasecmp($fromParts[0], $toParts[0]) !== 0) {
+            return null;
+        }
+
+        $common = 0;
+        $limit = min(count($fromParts), count($toParts));
+
+        while ($common < $limit && $fromParts[$common] === $toParts[$common]) {
+            $common++;
+        }
+
+        return implode('/', array_merge(
+            array_fill(0, count($fromParts) - $common, '..'),
+            array_slice($toParts, $common),
+        ));
+    }
+
+    private function absolutePath(string $path): string
+    {
+        $real = realpath($path);
+        $path = $real !== false ? $real : $path;
+
+        if (preg_match('/^(?:[A-Za-z]:[\\\\\/]|[\\\\\/])/', $path) !== 1) {
+            $path = getcwd().DIRECTORY_SEPARATOR.$path;
+        }
+
+        return str_replace('\\', '/', $path);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function pathParts(string $path): array
+    {
+        return array_values(array_filter(
+            explode('/', trim($path, '/')),
+            static fn (string $part): bool => $part !== '',
+        ));
     }
 
     private function ensureDirectory(string $path): void

@@ -14,7 +14,7 @@ class ProviderRegistry
 
     public function register(PreviewProvider $provider): void
     {
-        $this->providers[$provider->name()] = $provider;
+        $this->providers[strtolower($provider->name())] = $provider;
     }
 
     public function get(string $name): PreviewProvider
