@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
 use Oxhq\Preview\Providers\StripeProvider;
+use Oxhq\Preview\Core\Transport\CloudflareTunnelTransport;
+use Oxhq\Preview\Core\Transport\NgrokTunnelTransport;
 
 return [
     'storage_path' => env('PREVIEW_STORAGE_PATH', storage_path('framework/preview/captures')),
@@ -26,8 +28,8 @@ return [
     ],
 
     'transports' => [
-        'cloudflare' => null,
-        'ngrok' => null,
+        'cloudflare' => CloudflareTunnelTransport::class,
+        'ngrok' => NgrokTunnelTransport::class,
         'stripe-cli' => null,
     ],
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Tests\Commands;
 
 use Oxhq\Preview\Capture\CaptureRepository;
+use Oxhq\Preview\Capture\HttpReplayDispatcher;
+use Oxhq\Preview\Capture\ReplayResult;
 use Oxhq\Preview\Tests\TestCase;
 
 final class CaptureCommandsTest extends TestCase
@@ -63,5 +65,42 @@ final class CaptureCommandsTest extends TestCase
         $this->artisan('preview:capture:test', ['capture' => $record->id])
             ->expectsOutputToContain('Pest test generated')
             ->assertExitCode(0);
+    }
+
+    public function test_capture_replay_can_dispatch_to_http_target_with_injected_transport(): void
+    {
+        $requests = [];
+
+        $this->app->instance(HttpReplayDispatcher::class, new HttpReplayDispatcher(
+            function (string $url, string $method, array $headers, string $body, array $payload) use (&$requests): ReplayResult {
+                $requests[] = compact('url', 'method', 'headers', 'body', 'payload');
+
+                return new ReplayResult(204, '');
+            },
+        ));
+
+        $this->artisan('preview:capture', [
+            'provider' => 'generic',
+            '--path' => '/webhooks/orders',
+            '--body' => '{"id":1}',
+            '--header' => ['X-Preview-Event: order.created'],
+        ])->assertExitCode(0);
+
+        $record = app(CaptureRepository::class)->all()[0];
+
+        $this->artisan('preview:capture:replay', [
+            'capture' => $record->id,
+            '--exact' => true,
+            '--send-to' => 'https://receiver.test',
+        ])
+            ->expectsOutputToContain('Replay payload ready')
+            ->expectsOutput('Replay HTTP status: 204')
+            ->expectsOutput('Replay dispatch: success')
+            ->assertExitCode(0);
+
+        $this->assertSame('https://receiver.test/webhooks/orders', $requests[0]['url']);
+        $this->assertSame('POST', $requests[0]['method']);
+        $this->assertSame('{"id":1}', $requests[0]['body']);
+        $this->assertContains('X-Preview-Event: order.created', $requests[0]['headers']);
     }
 }

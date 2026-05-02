@@ -118,6 +118,8 @@ v0.1 supports user-owned transport:
 
 Provider-specific transports are allowed as optional convenience adapters. For example, Stripe CLI may exist for Stripe capture, but it must not define the product architecture.
 
+The v0.1 transport registry exposes `cloudflare` and `ngrok` adapters. This is package-level proof until real binaries, account state, and live tunnel startup are verified on a developer machine.
+
 ## Capture Module
 
 `Preview\Capture` is the v0.1 center of gravity.
@@ -136,8 +138,9 @@ It owns:
 Replay modes:
 
 ```bash
-php artisan preview:capture replay {capture} --exact
-php artisan preview:capture replay {capture} --resign
+php artisan preview:capture:replay {capture} --exact
+php artisan preview:capture:replay {capture} --resign
+php artisan preview:capture:replay {capture} --exact --send-to=https://local-app.test
 ```
 
 `--exact` sends the captured body and captured headers.
@@ -145,6 +148,8 @@ php artisan preview:capture replay {capture} --resign
 `--resign` sends the captured body with fresh provider-valid headers when the provider supports signing.
 
 This distinction is required because some providers use timestamped signatures. Exact replay is useful for debugging. Re-signed replay is useful for durable tests.
+
+Without `--send-to`, replay remains summary-only and prints the payload shape. With `--send-to`, Laravel Preview sends the captured method, path, query, headers, and raw body to the target base URL or full URL.
 
 ## Providers Module
 
@@ -270,6 +275,7 @@ php artisan preview:capture:show {capture}
 
 php artisan preview:capture:replay {capture} --exact
 php artisan preview:capture:replay {capture} --resign
+php artisan preview:capture:replay {capture} --exact --send-to=https://local-app.test
 
 php artisan preview:capture:fixture {capture}
 php artisan preview:capture:test {capture}

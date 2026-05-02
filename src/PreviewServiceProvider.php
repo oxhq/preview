@@ -12,10 +12,15 @@ use Oxhq\Preview\Commands\CaptureReplayCommand;
 use Oxhq\Preview\Commands\CaptureShowCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
 use Oxhq\Preview\Capture\CaptureRepository;
+use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\ReplayService;
 use Oxhq\Preview\Core\CaptureId;
 use Oxhq\Preview\Core\ProviderRegistry;
 use Oxhq\Preview\Core\RedactionPolicy;
+use Oxhq\Preview\Core\Transport\CloudflareTunnelTransport;
+use Oxhq\Preview\Core\Transport\NgrokTunnelTransport;
+use Oxhq\Preview\Core\Transport\TransportRegistry;
+use Oxhq\Preview\Core\Transport\TunnelTransport;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
 use Oxhq\Preview\Providers\StripeProvider;
@@ -51,6 +56,27 @@ class PreviewServiceProvider extends ServiceProvider
             return $registry;
         });
 
+        $this->app->singleton(TransportRegistry::class, function (): TransportRegistry {
+            $registry = new TransportRegistry();
+
+            foreach ((array) config('preview.transports', []) as $name => $transport) {
+                if (! is_string($name) || ! is_string($transport) || $transport === '') {
+                    continue;
+                }
+
+                $instance = $this->app->make($transport);
+
+                if ($instance instanceof TunnelTransport) {
+                    $registry->register($name, $instance);
+                }
+            }
+
+            return $registry;
+        });
+
+        $this->app->bind(CloudflareTunnelTransport::class);
+        $this->app->bind(NgrokTunnelTransport::class);
+
         $this->app->singleton(CaptureRepository::class, function (): CaptureRepository {
             return new CaptureRepository(
                 config('preview.storage_path'),
@@ -65,6 +91,8 @@ class PreviewServiceProvider extends ServiceProvider
                 $this->app->make(ProviderRegistry::class),
             );
         });
+
+        $this->app->singleton(HttpReplayDispatcher::class);
 
         $this->app->singleton(FixtureWriter::class, function (): FixtureWriter {
             return new FixtureWriter(

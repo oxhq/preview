@@ -7,6 +7,7 @@ namespace Oxhq\Preview\Tests;
 use Oxhq\Preview\Core\CaptureId;
 use Oxhq\Preview\Core\ProviderRegistry;
 use Oxhq\Preview\Core\RedactionPolicy;
+use Oxhq\Preview\Core\Transport\TransportRegistry;
 
 class FoundationTest extends TestCase
 {
@@ -15,6 +16,7 @@ class FoundationTest extends TestCase
         $this->assertInstanceOf(CaptureId::class, app(CaptureId::class));
         $this->assertInstanceOf(RedactionPolicy::class, app(RedactionPolicy::class));
         $this->assertInstanceOf(ProviderRegistry::class, app(ProviderRegistry::class));
+        $this->assertInstanceOf(TransportRegistry::class, app(TransportRegistry::class));
     }
 
     public function test_redaction_policy_redacts_sensitive_headers(): void
