@@ -165,15 +165,6 @@ final class CaptureRepository
             return ['verified' => $result, 'message' => null];
         }
 
-        foreach (['verified', 'isVerified', 'valid', 'isValid', 'success', 'passed'] as $method) {
-            if (is_object($result) && method_exists($result, $method)) {
-                $verified = (bool) $result->{$method}();
-                $message = method_exists($result, 'message') ? $result->message() : null;
-
-                return ['verified' => $verified, 'message' => is_string($message) ? $message : null];
-            }
-        }
-
         foreach (['verified', 'valid', 'success', 'passed'] as $property) {
             if (is_object($result) && property_exists($result, $property)) {
                 $message = property_exists($result, 'message') ? $result->message : null;
@@ -182,6 +173,15 @@ final class CaptureRepository
                     'verified' => (bool) $result->{$property},
                     'message' => is_string($message) ? $message : null,
                 ];
+            }
+        }
+
+        foreach (['verified', 'isVerified', 'valid', 'isValid', 'success', 'passed'] as $method) {
+            if (is_object($result) && method_exists($result, $method)) {
+                $verified = (bool) $result->{$method}();
+                $message = method_exists($result, 'message') ? $result->message() : null;
+
+                return ['verified' => $verified, 'message' => is_string($message) ? $message : null];
             }
         }
 

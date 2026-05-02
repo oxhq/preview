@@ -276,6 +276,7 @@ The same fixture should later power:
 php artisan preview:capture generic
 php artisan preview:capture hmac --signature-header=X-Signature
 php artisan preview:capture stripe
+php artisan preview:capture generic --transport=cloudflare --local-url=http://127.0.0.1:8000
 
 php artisan preview:capture:list
 php artisan preview:capture:show {capture}
@@ -295,6 +296,14 @@ php artisan preview:capture stripe --transport=stripe-cli
 ```
 
 That command is a convenience path, not the default architecture.
+
+Inbound capture endpoint:
+
+```text
+/__preview/capture/{provider}
+```
+
+The endpoint accepts common HTTP methods, stores a local capture, and returns safe JSON metadata only. It does not return raw body or captured headers. If `X-Preview-Original-Path` is present, that value is stored as the captured application path; otherwise the package route path is stored.
 
 ## v0.1 Success Criteria
 

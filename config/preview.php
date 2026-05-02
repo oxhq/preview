@@ -40,6 +40,11 @@ return [
 
     'live_enabled' => env('PREVIEW_LIVE_ENABLED', false),
 
+    'http_capture' => [
+        'enabled' => env('PREVIEW_HTTP_CAPTURE_ENABLED', true),
+        'path' => env('PREVIEW_HTTP_CAPTURE_PATH', '/__preview/capture/{provider}'),
+    ],
+
     'hmac' => [
         'signature_header' => env('PREVIEW_HMAC_SIGNATURE_HEADER', 'X-Signature'),
         'secret' => env('PREVIEW_HMAC_SECRET', 'preview-secret'),

@@ -19,6 +19,11 @@ class FoundationTest extends TestCase
         $this->assertInstanceOf(TransportRegistry::class, app(TransportRegistry::class));
     }
 
+    public function test_it_registers_http_capture_route(): void
+    {
+        $this->assertTrue(app('router')->has('preview.capture'));
+    }
+
     public function test_redaction_policy_redacts_sensitive_headers(): void
     {
         $policy = new RedactionPolicy(['authorization', 'cookie']);

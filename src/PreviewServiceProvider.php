@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Oxhq\Preview;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
 use Oxhq\Preview\Commands\CaptureCommand;
 use Oxhq\Preview\Commands\CaptureFixtureCommand;
 use Oxhq\Preview\Commands\CaptureListCommand;
@@ -21,6 +22,7 @@ use Oxhq\Preview\Core\Transport\CloudflareTunnelTransport;
 use Oxhq\Preview\Core\Transport\NgrokTunnelTransport;
 use Oxhq\Preview\Core\Transport\TransportRegistry;
 use Oxhq\Preview\Core\Transport\TunnelTransport;
+use Oxhq\Preview\Http\CaptureController;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
 use Oxhq\Preview\Providers\StripeProvider;
@@ -133,6 +135,14 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureShowCommand::class,
                 CaptureTestCommand::class,
             ]);
+        }
+
+        if ((bool) config('preview.http_capture.enabled', true)) {
+            Route::match(
+                ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+                (string) config('preview.http_capture.path', '/__preview/capture/{provider}'),
+                CaptureController::class,
+            )->name('preview.capture');
         }
     }
 }

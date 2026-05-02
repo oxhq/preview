@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\PreviewRequest;
 use Oxhq\Preview\Core\ProviderRegistry;
+use Oxhq\Preview\Core\Transport\TransportRegistry;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\PreviewProvider;
 use Throwable;
@@ -22,13 +23,16 @@ final class CaptureCommand extends Command
         {--header=* : Header as "Name: value"; may be repeated}
         {--query=* : Query value as "name=value"; may be repeated}
         {--signature-header= : Required for hmac provider captures}
-        {--live : Require preview.live_enabled before allowing live capture}';
+        {--live : Require preview.live_enabled before allowing live capture}
+        {--transport= : Tunnel transport to expose the local capture endpoint}
+        {--local-url=http://127.0.0.1:8000 : Local application URL for tunnel transports}';
 
     protected $description = 'Create a local v0.1 Preview capture from CLI-supplied request data.';
 
     public function __construct(
         private readonly ProviderRegistry $providers,
         private readonly CaptureRepository $captures,
+        private readonly TransportRegistry $transports,
     ) {
         parent::__construct();
     }
@@ -42,7 +46,7 @@ final class CaptureCommand extends Command
         }
 
         $requestedProvider = (string) $this->argument('provider');
-        $providerName = $requestedProvider === 'hmac' ? 'generic-hmac' : $requestedProvider;
+        $providerName = $requestedProvider;
 
         if ($requestedProvider === 'hmac' && (string) $this->option('signature-header') === '') {
             $this->error('The hmac provider requires --signature-header.');
@@ -56,6 +60,12 @@ final class CaptureCommand extends Command
             $this->error($exception->getMessage());
 
             return self::FAILURE;
+        }
+
+        $transportName = (string) $this->option('transport');
+
+        if ($transportName !== '' && ! $this->hasSyntheticRequestData()) {
+            return $this->openTunnel($providerName, $transportName);
         }
 
         $path = (string) $this->option('path');
@@ -87,6 +97,39 @@ final class CaptureCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    private function openTunnel(string $providerName, string $transportName): int
+    {
+        try {
+            $transport = $this->transports->get($transportName);
+            $handle = $transport->open((string) $this->option('local-url'));
+        } catch (Throwable $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+
+        try {
+            $captureUrl = rtrim($handle->publicUrl, '/').'/__preview/capture/'.rawurlencode($providerName);
+
+            $this->line("Capture URL: {$captureUrl}");
+
+            return self::SUCCESS;
+        } finally {
+            $transport->close($handle);
+        }
+    }
+
+    private function hasSyntheticRequestData(): bool
+    {
+        foreach (['--body', '--header', '--query', '--method', '--path'] as $option) {
+            if ($this->input->hasParameterOption($option, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function provider(string $providerName): PreviewProvider
