@@ -51,6 +51,27 @@ final class CaptureCommandsTest extends TestCase
         $this->assertCount(0, app(CaptureRepository::class)->all());
     }
 
+    public function test_hmac_tunnel_capture_url_carries_signature_header_for_http_endpoint(): void
+    {
+        $transport = new RecordingTunnelTransport('https://public.example.test');
+        $registry = new TransportRegistry();
+        $registry->register('cloudflare', $transport);
+        $this->app->instance(TransportRegistry::class, $registry);
+
+        $this->artisan('preview:capture', [
+            'provider' => 'hmac',
+            '--signature-header' => 'X-Custom-Signature',
+            '--transport' => 'cloudflare',
+            '--local-url' => 'http://127.0.0.1:9000',
+        ])
+            ->expectsOutput('Capture URL: https://public.example.test/__preview/capture/hmac?signature_header=X-Custom-Signature')
+            ->assertExitCode(0);
+
+        $this->assertSame(['http://127.0.0.1:9000'], $transport->openedLocalUrls);
+        $this->assertSame(['https://public.example.test'], $transport->closedPublicUrls);
+    }
+
+
     public function test_explicit_synthetic_capture_options_take_precedence_over_transport(): void
     {
         $transport = new RecordingTunnelTransport('https://public.example.test');

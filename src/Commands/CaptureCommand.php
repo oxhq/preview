@@ -123,6 +123,10 @@ final class CaptureCommand extends Command
         try {
             $captureUrl = rtrim($handle->publicUrl, '/').'/__preview/capture/'.rawurlencode($providerName);
 
+            if ($providerName === 'hmac') {
+                $captureUrl .= '?signature_header='.rawurlencode((string) $this->option('signature-header'));
+            }
+
             $this->line("Capture URL: {$captureUrl}");
             $this->holdTunnel($holdSeconds);
 
