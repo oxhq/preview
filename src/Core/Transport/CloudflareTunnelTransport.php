@@ -14,6 +14,7 @@ class CloudflareTunnelTransport extends ProcessTunnelTransport
         float $urlTimeoutSeconds = 2.0,
         int $pollIntervalMicroseconds = 50_000,
         private readonly string $binary = 'cloudflared',
+        private readonly float $readinessDelaySeconds = 0.0,
     ) {
         parent::__construct($processFactory, $urlTimeoutSeconds, $pollIntervalMicroseconds);
     }
@@ -36,5 +37,15 @@ class CloudflareTunnelTransport extends ProcessTunnelTransport
     protected function name(): string
     {
         return 'cloudflare';
+    }
+
+    protected function isReady(string $output, string $publicUrl): bool
+    {
+        return str_contains($output, 'Registered tunnel connection');
+    }
+
+    protected function readinessDelaySeconds(): float
+    {
+        return $this->readinessDelaySeconds;
     }
 }

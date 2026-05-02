@@ -15,7 +15,7 @@ final class ProcessTunnelTransportTest extends TestCase
     public function test_cloudflare_tunnel_starts_expected_command_and_parses_public_url(): void
     {
         $process = new FakeTransportProcess(
-            output: '2026-05-02 INF Requesting new quick Tunnel on https://preview-demo.trycloudflare.com',
+            output: '2026-05-02 INF Your quick Tunnel has been created! https://preview-demo.trycloudflare.com 2026-05-02 INF Registered tunnel connection',
             pid: 1234,
         );
         $factory = new RecordingProcessFactory($process);
@@ -27,6 +27,24 @@ final class ProcessTunnelTransportTest extends TestCase
         $this->assertTrue($process->started);
         $this->assertSame('https://preview-demo.trycloudflare.com', $handle->publicUrl);
         $this->assertSame(1234, $handle->processId);
+    }
+
+    public function test_cloudflare_tunnel_waits_for_registered_connection_after_public_url(): void
+    {
+        $process = new FakeTransportProcess(
+            output: '2026-05-02 INF Your quick Tunnel has been created! https://preview-demo.trycloudflare.com',
+        );
+        $transport = new CloudflareTunnelTransport(
+            new RecordingProcessFactory($process)(...),
+            urlTimeoutSeconds: 0.01,
+            pollIntervalMicroseconds: 1,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to detect ready public tunnel URL for [cloudflare]');
+        $this->expectExceptionMessage('preview-demo.trycloudflare.com');
+
+        $transport->open('http://localhost:8000');
     }
 
     public function test_ngrok_tunnel_starts_expected_command_and_parses_forwarding_url(): void
@@ -53,7 +71,7 @@ final class ProcessTunnelTransportTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Unable to detect public tunnel URL for [cloudflare]');
+        $this->expectExceptionMessage('Unable to detect ready public tunnel URL for [cloudflare]');
         $this->expectExceptionMessage('starting tunnel without url');
 
         $transport->open('http://localhost:8000');

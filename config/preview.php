@@ -38,6 +38,10 @@ return [
         'ngrok' => env('PREVIEW_NGROK_BINARY', 'ngrok'),
     ],
 
+    'transport_readiness_delay' => [
+        'cloudflare' => (float) env('PREVIEW_CLOUDFLARE_READINESS_DELAY', 6),
+    ],
+
     'live_enabled' => env('PREVIEW_LIVE_ENABLED', false),
 
     'http_capture' => [

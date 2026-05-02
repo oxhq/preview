@@ -13,7 +13,7 @@ final class ConfiguredBinaryTransportTest extends TestCase
     public function test_cloudflare_transport_uses_configured_binary_path(): void
     {
         $process = new FakeTransportProcess(
-            output: 'https://preview-demo.trycloudflare.com',
+            output: 'https://preview-demo.trycloudflare.com Registered tunnel connection',
             pid: 1234,
         );
         $factory = new RecordingProcessFactory($process);

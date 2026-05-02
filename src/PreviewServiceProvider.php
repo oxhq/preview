@@ -79,6 +79,7 @@ class PreviewServiceProvider extends ServiceProvider
         $this->app->bind(CloudflareTunnelTransport::class, function (): CloudflareTunnelTransport {
             return new CloudflareTunnelTransport(
                 binary: (string) config('preview.transport_binaries.cloudflare', 'cloudflared'),
+                readinessDelaySeconds: (float) config('preview.transport_readiness_delay.cloudflare', 6),
             );
         });
 

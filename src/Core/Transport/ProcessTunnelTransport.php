@@ -30,18 +30,27 @@ abstract class ProcessTunnelTransport implements TunnelTransport
         $output = '';
         $deadline = microtime(true) + $this->urlTimeoutSeconds;
 
+        $publicUrl = null;
+        $readySince = null;
+
         do {
             $output .= $process->getIncrementalOutput();
             $output .= $process->getIncrementalErrorOutput();
 
-            $publicUrl = $this->parsePublicUrl($output);
+            $publicUrl ??= $this->parsePublicUrl($output);
 
-            if ($publicUrl !== null) {
-                return new TunnelHandle(
-                    publicUrl: $publicUrl,
-                    processId: $process->getPid(),
-                    metadata: ['process' => $process],
-                );
+            if ($publicUrl !== null && $this->isReady($output, $publicUrl)) {
+                $readySince ??= microtime(true);
+
+                if ((microtime(true) - $readySince) >= $this->readinessDelaySeconds()) {
+                    return new TunnelHandle(
+                        publicUrl: $publicUrl,
+                        processId: $process->getPid(),
+                        metadata: ['process' => $process],
+                    );
+                }
+            } else {
+                $readySince = null;
             }
 
             if (! $process->isRunning()) {
@@ -55,7 +64,7 @@ abstract class ProcessTunnelTransport implements TunnelTransport
 
         $timeout = rtrim(rtrim(sprintf('%.3F', $this->urlTimeoutSeconds), '0'), '.');
 
-        $message = "Unable to detect public tunnel URL for [{$this->name()}] within {$timeout} seconds.";
+        $message = "Unable to detect ready public tunnel URL for [{$this->name()}] within {$timeout} seconds.";
         $excerpt = trim($output);
 
         if ($excerpt !== '') {
@@ -80,6 +89,16 @@ abstract class ProcessTunnelTransport implements TunnelTransport
     abstract protected function parsePublicUrl(string $output): ?string;
 
     abstract protected function name(): string;
+
+    protected function isReady(string $output, string $publicUrl): bool
+    {
+        return true;
+    }
+
+    protected function readinessDelaySeconds(): float
+    {
+        return 0.0;
+    }
 
     private function excerpt(string $output): string
     {
