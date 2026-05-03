@@ -55,6 +55,12 @@ return [
         'path' => env('PREVIEW_HTTP_CAPTURE_PATH', '/__preview/capture/{provider}'),
     ],
 
+    'route_preview' => [
+        'enabled' => env('PREVIEW_ROUTE_PREVIEW_ENABLED', true),
+        'path' => env('PREVIEW_ROUTE_PREVIEW_PATH', '/__preview/route/{route}'),
+        'default_ttl' => env('PREVIEW_ROUTE_PREVIEW_TTL', '2h'),
+    ],
+
     'hmac' => [
         'signature_header' => env('PREVIEW_HMAC_SIGNATURE_HEADER', 'X-Signature'),
         'secret' => env('PREVIEW_HMAC_SECRET', 'preview-secret'),

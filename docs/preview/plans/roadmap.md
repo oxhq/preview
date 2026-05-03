@@ -71,23 +71,31 @@ Exit criteria:
 
 Goal: expose Laravel routes with Laravel-aware safety and context.
 
-CLI target:
+First implementation slice CLI target:
 
 ```bash
-php artisan preview:route billing.portal --ttl=2h --readonly-db
-php artisan preview:route checkout.success --guard=client
+php artisan preview:route {route} --ttl=2h --param=id=123 --readonly-db --guard=client
 ```
 
-Build:
+First slice ships:
 
 - named route lookup
 - middleware summary
-- TTL access links
-- signed guest access
-- `--readonly-db` transaction rollback for covered database writes
-- explicit warnings for side effects outside the database
+- TTL signed access links
+- route params through repeated `--param=key=value`
+- optional guard context summary
+- default blocking of routes that do not allow `GET` or `HEAD`
+- `--readonly-db` as a declared safety flag with warnings
 
-Do not call it `--readonly`. Database rollback does not protect queues, mail, cache, filesystem writes, external HTTP calls, or events.
+Do not call it `--readonly`. `--readonly-db` is not full readonly: database rollback does not protect queues, mail, cache, filesystem writes, external HTTP calls, or events.
+
+Later v0.3 follow-ups:
+
+- proxied request execution through signed access links
+- full request transaction rollback for covered database writes
+- explicit opt-in for exposing non-`GET`/`HEAD` routes
+- guard/session impersonation behavior beyond summary output
+- richer side-effect fakes
 
 Future safety flags:
 

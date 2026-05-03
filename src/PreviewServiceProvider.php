@@ -12,6 +12,7 @@ use Oxhq\Preview\Commands\CaptureListCommand;
 use Oxhq\Preview\Commands\CaptureReplayCommand;
 use Oxhq\Preview\Commands\CaptureShowCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
+use Oxhq\Preview\Commands\RoutePreviewCommand;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\ReplayService;
@@ -24,12 +25,14 @@ use Oxhq\Preview\Core\Transport\NgrokTunnelTransport;
 use Oxhq\Preview\Core\Transport\TransportRegistry;
 use Oxhq\Preview\Core\Transport\TunnelTransport;
 use Oxhq\Preview\Http\CaptureController;
+use Oxhq\Preview\Http\RoutePreviewController;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
 use Oxhq\Preview\Providers\GitHubProvider;
 use Oxhq\Preview\Providers\PreviewProvider;
 use Oxhq\Preview\Providers\ShopifyProvider;
 use Oxhq\Preview\Providers\StripeProvider;
+use Oxhq\Preview\Route\RoutePreviewService;
 use Oxhq\Preview\Testing\FixtureWriter;
 use Oxhq\Preview\Testing\PestTestWriter;
 
@@ -129,6 +132,7 @@ class PreviewServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(HttpReplayDispatcher::class);
+        $this->app->singleton(RoutePreviewService::class);
 
         $this->app->singleton(FixtureWriter::class, function (): FixtureWriter {
             return new FixtureWriter(
@@ -160,6 +164,7 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureReplayCommand::class,
                 CaptureShowCommand::class,
                 CaptureTestCommand::class,
+                RoutePreviewCommand::class,
             ]);
         }
 
@@ -169,6 +174,13 @@ class PreviewServiceProvider extends ServiceProvider
                 (string) config('preview.http_capture.path', '/__preview/capture/{provider}'),
                 CaptureController::class,
             )->name('preview.capture');
+        }
+
+        if ((bool) config('preview.route_preview.enabled', true)) {
+            Route::get(
+                (string) config('preview.route_preview.path', '/__preview/route/{route}'),
+                RoutePreviewController::class,
+            )->name('preview.route.access');
         }
     }
 

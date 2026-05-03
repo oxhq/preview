@@ -371,16 +371,34 @@ Trust is part of the product. "Local-first" must be enforced by behavior, not on
 
 ## Route Module
 
-`Preview\Route` is not part of v0.1. It ships only after capture-to-test proves demand.
+`Preview\Route` starts in v0.3 as Safe Route Preview. It is not part of v0.1 or v0.2.
 
-Future CLI:
+The first implementation slice is route-link generation, not full proxy execution:
 
 ```bash
-php artisan preview:route billing.portal --ttl=2h --readonly-db
-php artisan preview:route checkout.success --guard=client
+php artisan preview:route {route} --ttl=2h --param=id=123 --readonly-db --guard=client
+```
+
+Example:
+
+```bash
+php artisan preview:route billing.portal --ttl=2h --param=id=123 --readonly-db --guard=client
 ```
 
 Use `--readonly-db`, not `--readonly`.
+
+First slice scope:
+
+- named route lookup
+- middleware summary
+- TTL signed access links
+- route parameters from repeated `--param=key=value` flags
+- optional guard context summary through `--guard`
+- default blocking for routes that do not allow `GET` or `HEAD`
+- explicit opt-in before non-`GET`/`HEAD` routes can be exposed in later work
+- `--readonly-db` accepted as a declared safety flag with warnings
+
+`--readonly-db` does not mean the route is fully readonly. In this first slice it records and displays the operator's intended safety posture, then warns about the limits. Full request transaction rollback, proxied execution, and side-effect fakes are later v0.3 follow-ups.
 
 Database transaction rollback does not protect queues, mail, cache, filesystem writes, external HTTP calls, or events.
 
