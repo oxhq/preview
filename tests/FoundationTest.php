@@ -53,6 +53,8 @@ class FoundationTest extends TestCase
         $this->assertInstanceOf(ConfiguredPreviewProvider::class, $providers->get('custom'));
         $this->assertSame('generic', $providers->get('generic')->name());
         $this->assertSame('hmac', $providers->get('hmac')->name());
+        $this->assertSame('github', $providers->get('github')->name());
+        $this->assertSame('shopify', $providers->get('shopify')->name());
         $this->assertSame('stripe', $providers->get('stripe')->name());
     }
 }

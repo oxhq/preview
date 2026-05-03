@@ -10,8 +10,10 @@ use Oxhq\Preview\Capture\ReplayService;
 use Oxhq\Preview\Core\ProviderRegistry;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
+use Oxhq\Preview\Providers\GitHubProvider;
 use Oxhq\Preview\Providers\PreviewProvider;
 use Oxhq\Preview\Providers\ProviderCapability;
+use Oxhq\Preview\Providers\ShopifyProvider;
 use Oxhq\Preview\Providers\StripeProvider;
 use Oxhq\Preview\Testing\FixtureWriter;
 use Oxhq\Preview\Testing\PestTestWriter;
@@ -128,6 +130,58 @@ final class ProviderContractTest extends TestCase
             ),
             'hmac.created',
             'hmac.created',
+            'resign',
+            [
+                ProviderCapability::VerifiesSignature,
+                ProviderCapability::ExtractsEventType,
+                ProviderCapability::ReSignsPayload,
+                ProviderCapability::GeneratesFixture,
+                ProviderCapability::GeneratesTest,
+            ],
+        ];
+
+        $githubBody = '{"action":"opened","repository":{"full_name":"oxhq/preview"}}';
+        $githubProvider = new GitHubProvider('github-test-secret');
+
+        yield 'github' => [
+            $githubProvider,
+            PreviewRequest::make(
+                provider: 'github',
+                method: 'POST',
+                path: '/webhook/github',
+                headers: $githubProvider->sign($githubBody, [
+                    'X-GitHub-Event' => 'pull_request',
+                ]),
+                rawBody: $githubBody,
+            ),
+            'pull_request',
+            'github-pull_request',
+            'resign',
+            [
+                ProviderCapability::VerifiesSignature,
+                ProviderCapability::ExtractsEventType,
+                ProviderCapability::ReSignsPayload,
+                ProviderCapability::GeneratesFixture,
+                ProviderCapability::GeneratesTest,
+            ],
+        ];
+
+        $shopifyBody = '{"id":123,"email":"buyer@example.test"}';
+        $shopifyProvider = new ShopifyProvider('shopify-test-secret');
+
+        yield 'shopify' => [
+            $shopifyProvider,
+            PreviewRequest::make(
+                provider: 'shopify',
+                method: 'POST',
+                path: '/webhook/shopify',
+                headers: $shopifyProvider->sign($shopifyBody, [
+                    'X-Shopify-Topic' => 'orders/create',
+                ]),
+                rawBody: $shopifyBody,
+            ),
+            'orders/create',
+            'shopify-orders-create',
             'resign',
             [
                 ProviderCapability::VerifiesSignature,

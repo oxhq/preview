@@ -29,6 +29,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('preview.fixture_path', sys_get_temp_dir().'/preview-tests/fixtures');
         $app['config']->set('preview.test_path', sys_get_temp_dir().'/preview-tests/tests');
         $app['config']->set('preview.hmac.secret', 'test-secret');
+        $app['config']->set('preview.github.webhook_secret', 'github-test-secret');
+        $app['config']->set('preview.shopify.client_secret', 'shopify-test-secret');
         $app['config']->set('preview.stripe.endpoint_secret', 'whsec_test');
     }
 

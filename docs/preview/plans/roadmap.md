@@ -38,8 +38,8 @@ Goal: prove the provider model generalizes beyond Stripe.
 
 Candidate providers:
 
-- GitHub
-- Shopify
+- GitHub (shipped v0.2)
+- Shopify (shipped v0.2)
 - Paddle
 - Clerk
 - Slack
@@ -63,7 +63,7 @@ Do not add:
 
 Exit criteria:
 
-- at least two non-Stripe providers pass the same capture/replay/fixture/test contract
+- at least two non-Stripe providers pass the same capture/replay/fixture/test contract (met by GitHub and Shopify)
 - provider contribution path is documented and tested
 - no provider requires special branches in Core, Capture, Replay, or Testing services
 

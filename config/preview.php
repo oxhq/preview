@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
+use Oxhq\Preview\Providers\GitHubProvider;
+use Oxhq\Preview\Providers\ShopifyProvider;
 use Oxhq\Preview\Providers\StripeProvider;
 use Oxhq\Preview\Core\Transport\CloudflareTunnelTransport;
 use Oxhq\Preview\Core\Transport\NgrokTunnelTransport;
@@ -17,6 +19,8 @@ return [
         'authorization',
         'cookie',
         'set-cookie',
+        'x-hub-signature-256',
+        'x-shopify-hmac-sha256',
         'x-stripe-signature',
         'stripe-signature',
     ],
@@ -24,6 +28,8 @@ return [
     'providers' => [
         'generic' => GenericProvider::class,
         'hmac' => GenericHmacProvider::class,
+        'github' => GitHubProvider::class,
+        'shopify' => ShopifyProvider::class,
         'stripe' => StripeProvider::class,
     ],
 
@@ -53,6 +59,14 @@ return [
         'signature_header' => env('PREVIEW_HMAC_SIGNATURE_HEADER', 'X-Signature'),
         'secret' => env('PREVIEW_HMAC_SECRET', 'preview-secret'),
         'algorithm' => env('PREVIEW_HMAC_ALGORITHM', 'sha256'),
+    ],
+
+    'github' => [
+        'webhook_secret' => env('PREVIEW_GITHUB_WEBHOOK_SECRET', 'github-preview-secret'),
+    ],
+
+    'shopify' => [
+        'client_secret' => env('PREVIEW_SHOPIFY_CLIENT_SECRET', 'shopify-preview-secret'),
     ],
 
     'stripe' => [

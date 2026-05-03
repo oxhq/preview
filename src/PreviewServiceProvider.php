@@ -26,7 +26,9 @@ use Oxhq\Preview\Core\Transport\TunnelTransport;
 use Oxhq\Preview\Http\CaptureController;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
+use Oxhq\Preview\Providers\GitHubProvider;
 use Oxhq\Preview\Providers\PreviewProvider;
+use Oxhq\Preview\Providers\ShopifyProvider;
 use Oxhq\Preview\Providers\StripeProvider;
 use Oxhq\Preview\Testing\FixtureWriter;
 use Oxhq\Preview\Testing\PestTestWriter;
@@ -52,6 +54,12 @@ class PreviewServiceProvider extends ServiceProvider
                 (string) config('preview.hmac.signature_header', 'X-Signature'),
                 (string) config('preview.hmac.secret', 'preview-secret'),
                 (string) config('preview.hmac.algorithm', 'sha256'),
+            ));
+            $registry->register(new GitHubProvider(
+                (string) config('preview.github.webhook_secret', 'github-preview-secret'),
+            ));
+            $registry->register(new ShopifyProvider(
+                (string) config('preview.shopify.client_secret', 'shopify-preview-secret'),
             ));
             $registry->register(new StripeProvider(
                 (string) config('preview.stripe.endpoint_secret', 'whsec_preview'),
@@ -169,6 +177,8 @@ class PreviewServiceProvider extends ServiceProvider
         return in_array($providerClass, [
             GenericProvider::class,
             GenericHmacProvider::class,
+            GitHubProvider::class,
+            ShopifyProvider::class,
             StripeProvider::class,
         ], true);
     }

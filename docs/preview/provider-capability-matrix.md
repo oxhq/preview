@@ -7,8 +7,8 @@ Internal matrix for v0.2 provider expansion. This is a planning and contribution
 | Generic | Shipped v0.1 | No | Yes | No | Yes | Yes | Uses `X-Preview-Event`; no provider signature semantics. |
 | Generic HMAC | Shipped v0.1 | Yes | Yes | Yes | Yes | Yes | Configurable signature header, shared secret, and algorithm. |
 | Stripe | Shipped v0.1 reference | Yes | Yes | Yes | Yes | Yes | High-fidelity reference for timestamped signatures and raw body replay. |
-| GitHub | Candidate | TBD | TBD | TBD | TBD | TBD | Build only after named user demand or a real integration requires it. |
-| Shopify | Candidate | TBD | TBD | TBD | TBD | TBD | Build only after named user demand or a real integration requires it. |
+| GitHub | Shipped v0.2 | Yes | Yes | Yes | Yes | Yes | Uses `X-Hub-Signature-256`, `X-GitHub-Event`, and raw-body HMAC-SHA256. |
+| Shopify | Shipped v0.2 | Yes | Yes | Yes | Yes | Yes | Uses `X-Shopify-Hmac-Sha256`, `X-Shopify-Topic`, and base64 raw-body HMAC-SHA256. |
 | Paddle | Candidate | TBD | TBD | TBD | TBD | TBD | Build only after named user demand or a real integration requires it. |
 | Clerk | Candidate | TBD | TBD | TBD | TBD | TBD | Build only after named user demand or a real integration requires it. |
 | Slack | Candidate | TBD | TBD | TBD | TBD | TBD | Build only after named user demand or a real integration requires it. |

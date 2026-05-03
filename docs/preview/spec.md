@@ -225,6 +225,13 @@ v0.1 providers:
 
 Stripe is the first high-fidelity reference provider because it proves timestamped signatures, raw body fidelity, event extraction, fixture generation, and re-signing. It is not the product center.
 
+v0.2 providers:
+
+- `GitHubProvider`
+- `ShopifyProvider`
+
+These prove the provider model beyond Stripe without adding provider-specific branches to Core, Capture, Replay, or Testing services.
+
 ## Testing Module
 
 `Preview\Testing` owns generated Laravel test assets:
