@@ -10,7 +10,6 @@ use InvalidArgumentException;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\PreviewRequest;
 use Oxhq\Preview\Core\ProviderRegistry;
-use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\PreviewProvider;
 
 final class CaptureController
@@ -54,15 +53,7 @@ final class CaptureController
 
     private function providerFor(Request $request, string $provider): PreviewProvider
     {
-        if ($provider === 'hmac' && is_string($request->query('signature_header')) && trim((string) $request->query('signature_header')) !== '') {
-            return new GenericHmacProvider(
-                trim((string) $request->query('signature_header')),
-                (string) config('preview.hmac.secret', 'preview-secret'),
-                (string) config('preview.hmac.algorithm', 'sha256'),
-            );
-        }
-
-        return $this->providers->get($provider);
+        return $this->providers->get($provider, $request->query->all());
     }
 
     private function capturePath(Request $request): string

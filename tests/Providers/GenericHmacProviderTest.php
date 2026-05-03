@@ -88,4 +88,48 @@ final class GenericHmacProviderTest extends TestCase
             'algorithm' => 'sha512',
         ], $context);
     }
+
+    public function test_it_creates_contextual_instances_from_runtime_context(): void
+    {
+        $provider = new GenericHmacProvider('X-Signature', 'secret');
+        $contextualProvider = $provider->withRuntimeContext([
+            'signature_header' => ' X-Custom-Signature ',
+            'algorithm' => 'sha512',
+        ]);
+        $body = '{"event":"order.created"}';
+
+        $this->assertNotSame($provider, $contextualProvider);
+        $this->assertTrue($contextualProvider->verify(PreviewRequest::make(
+            provider: 'hmac',
+            method: 'POST',
+            path: '/webhook',
+            headers: ['X-Custom-Signature' => hash_hmac('sha512', $body, 'secret')],
+            rawBody: $body,
+        ))->verified);
+        $this->assertFalse($contextualProvider->verify(PreviewRequest::make(
+            provider: 'hmac',
+            method: 'POST',
+            path: '/webhook',
+            headers: ['X-Signature' => hash_hmac('sha256', $body, 'secret')],
+            rawBody: $body,
+        ))->verified);
+    }
+
+    public function test_it_ignores_empty_runtime_context_values(): void
+    {
+        $provider = new GenericHmacProvider('X-Signature', 'secret');
+        $contextualProvider = $provider->withRuntimeContext([
+            'signature_header' => ' ',
+            'algorithm' => '',
+        ]);
+        $body = '{"event":"order.created"}';
+
+        $this->assertTrue($contextualProvider->verify(PreviewRequest::make(
+            provider: 'hmac',
+            method: 'POST',
+            path: '/webhook',
+            headers: ['X-Signature' => hash_hmac('sha256', $body, 'secret')],
+            rawBody: $body,
+        ))->verified);
+    }
 }

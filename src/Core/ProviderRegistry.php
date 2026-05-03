@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Core;
 
 use InvalidArgumentException;
+use Oxhq\Preview\Providers\ContextualPreviewProvider;
 use Oxhq\Preview\Providers\PreviewProvider;
 
 class ProviderRegistry
@@ -17,7 +18,10 @@ class ProviderRegistry
         $this->providers[strtolower($provider->name())] = $provider;
     }
 
-    public function get(string $name): PreviewProvider
+    /**
+     * @param array<string, mixed> $context
+     */
+    public function get(string $name, array $context = []): PreviewProvider
     {
         $key = strtolower($name);
 
@@ -25,7 +29,11 @@ class ProviderRegistry
             throw new InvalidArgumentException("Unknown preview provider [{$name}].");
         }
 
-        return $this->providers[$key];
+        $provider = $this->providers[$key];
+
+        return $context !== [] && $provider instanceof ContextualPreviewProvider
+            ? $provider->withRuntimeContext($context)
+            : $provider;
     }
 
     /** @return array<string, PreviewProvider> */

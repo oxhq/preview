@@ -22,6 +22,20 @@ interface PreviewProvider
 
 Register the provider through `preview.providers`. Core, Capture, Replay, and Testing services must keep using the provider interface; do not add provider-specific branches outside the provider.
 
+Providers that need runtime/query/fixture settings may also implement
+`Oxhq\Preview\Providers\ContextualPreviewProvider`:
+
+```php
+interface ContextualPreviewProvider extends PreviewProvider
+{
+    public function withRuntimeContext(array $context): PreviewProvider;
+}
+```
+
+`ProviderRegistry::get($name, $context)` applies the hook when the provider
+supports it. Use this for provider-owned settings such as HMAC signature header
+names, signing algorithms, webhook versions, or event type header names.
+
 ## Implementation Rules
 
 - `name()` returns the stable config and fixture segment, such as `github`.
@@ -30,6 +44,7 @@ Register the provider through `preview.providers`. Core, Capture, Replay, and Te
 - `eventType()` extracts the provider event name when available.
 - `fixtureName()` returns a deterministic, filesystem-safe name.
 - `fixtureContext()` may store non-secret replay metadata, such as signature header name, algorithm, webhook version, or event header name.
+- `withRuntimeContext()` may apply non-secret runtime/query/fixture settings when the provider implements `ContextualPreviewProvider`.
 - `canSign()` returns true only when `sign()` can generate provider-valid fresh headers from the raw body.
 - `sign()` returns only headers needed for fresh replay. It must not mutate the payload or read secrets from fixture files.
 
@@ -59,6 +74,11 @@ Do not store:
 - raw captured headers that are already redacted elsewhere
 
 If the provider needs a secret for fresh signing, read it from Laravel config or environment at runtime.
+
+Runtime context is for behavior, not storage. For example, an HMAC provider can
+use context to choose `X-Signature` and `sha256` during verification or
+re-signing, then use `fixtureContext()` to persist those non-secret choices for
+future replay.
 
 ## Redaction And Secrets
 

@@ -80,4 +80,35 @@ final class ReplayServiceTest extends TestCase
         $this->assertSame('Bearer secret', $service->resign($record)['headers']['Authorization']);
         $this->assertSame('[redacted]', $record->headers['Authorization']);
     }
+
+    public function test_it_uses_capture_fixture_context_when_resigning_hmac_payloads(): void
+    {
+        $root = sys_get_temp_dir().'/preview-replay-contextual-sign-'.bin2hex(random_bytes(4));
+        $captureProvider = new GenericHmacProvider('X-Custom-Signature', 'secret', 'sha512');
+        $registryProvider = new GenericHmacProvider('X-Signature', 'secret');
+        $repository = new CaptureRepository($root, new RedactionPolicy(['authorization', 'cookie']));
+        $record = $repository->store(
+            PreviewRequest::make(
+                'hmac',
+                'POST',
+                '/webhook',
+                [],
+                [
+                    'X-Custom-Signature' => hash_hmac('sha512', '{"ok":true}', 'secret'),
+                    'X-Captured' => '1',
+                ],
+                '{"ok":true}',
+            ),
+            $captureProvider,
+        );
+        $registry = new ProviderRegistry();
+        $registry->register($registryProvider);
+        $service = new ReplayService($repository, $registry);
+
+        $headers = $service->resign($record)['headers'];
+
+        $this->assertSame(hash_hmac('sha512', '{"ok":true}', 'secret'), $headers['X-Custom-Signature']);
+        $this->assertArrayNotHasKey('X-Signature', $headers);
+        $this->assertSame('1', $headers['X-Captured']);
+    }
 }

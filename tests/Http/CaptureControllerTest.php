@@ -93,6 +93,10 @@ final class CaptureControllerTest extends TestCase
 
         $this->assertSame('hmac', $record->provider);
         $this->assertSame('/webhooks/hmac', $record->path);
+        $this->assertSame([
+            'signature_header' => 'X-Custom-Signature',
+            'algorithm' => 'sha256',
+        ], $record->metadata['fixture_context']);
     }
 
     public function test_hmac_capture_endpoint_uses_configured_signature_header_without_query_override(): void

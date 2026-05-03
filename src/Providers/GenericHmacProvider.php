@@ -6,7 +6,7 @@ namespace Oxhq\Preview\Providers;
 
 use Oxhq\Preview\Capture\PreviewRequest;
 
-class GenericHmacProvider extends GenericProvider
+class GenericHmacProvider extends GenericProvider implements ContextualPreviewProvider
 {
     public function __construct(
         private readonly string $signatureHeaderName,
@@ -57,6 +57,17 @@ class GenericHmacProvider extends GenericProvider
         ];
     }
 
+    public function withRuntimeContext(array $context): PreviewProvider
+    {
+        return new self(
+            $this->nonEmptyString($context['signature_header'] ?? null)
+                ?? $this->signatureHeaderName,
+            $this->sharedSecret,
+            $this->nonEmptyString($context['algorithm'] ?? null)
+                ?? $this->algorithm,
+        );
+    }
+
     public function canSign(): bool
     {
         return true;
@@ -78,5 +89,16 @@ class GenericHmacProvider extends GenericProvider
         }
 
         return $signature;
+    }
+
+    private function nonEmptyString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

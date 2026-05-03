@@ -188,6 +188,22 @@ interface PreviewProvider
 }
 ```
 
+Providers that need runtime/query/fixture settings may also implement
+`Oxhq\Preview\Providers\ContextualPreviewProvider`:
+
+```php
+interface ContextualPreviewProvider extends PreviewProvider
+{
+    /** @param array<string, mixed> $context */
+    public function withRuntimeContext(array $context): PreviewProvider;
+}
+```
+
+`ProviderRegistry::get($name, $context)` applies this optional hook before the
+provider is used. Providers should use it for provider-owned settings such as
+signature header names, HMAC algorithms, webhook versions, or event header
+names. Services should not add provider-specific branches for those settings.
+
 Provider capabilities:
 
 ```php

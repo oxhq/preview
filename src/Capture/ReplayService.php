@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Capture;
 
 use Oxhq\Preview\Core\ProviderRegistry;
-use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\PreviewProvider;
 use RuntimeException;
 
@@ -81,35 +80,6 @@ final class ReplayService
     {
         $context = $record->metadata['fixture_context'] ?? [];
 
-        if ($record->provider === 'hmac' && is_array($context) && isset($context['signature_header']) && is_string($context['signature_header'])) {
-            return new GenericHmacProvider(
-                $context['signature_header'],
-                (string) $this->configValue('preview.hmac.secret', 'preview-secret'),
-                isset($context['algorithm']) && is_string($context['algorithm'])
-                    ? $context['algorithm']
-                    : (string) $this->configValue('preview.hmac.algorithm', 'sha256'),
-            );
-        }
-
-        return $this->providers->get($record->provider);
-    }
-
-    private function configValue(string $key, mixed $default): mixed
-    {
-        if (! function_exists('app') || ! function_exists('config')) {
-            return $default;
-        }
-
-        try {
-            $app = app();
-
-            if (method_exists($app, 'bound') && $app->bound('config')) {
-                return config($key, $default);
-            }
-        } catch (\Throwable) {
-            return $default;
-        }
-
-        return $default;
+        return $this->providers->get($record->provider, is_array($context) ? $context : []);
     }
 }

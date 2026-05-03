@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Testing;
 
 use Oxhq\Preview\Core\ProviderRegistry;
-use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\PreviewProvider;
 use RuntimeException;
 
@@ -240,36 +239,7 @@ final class PreviewFixture
 
     private function providerForSigning(ProviderRegistry $registry): PreviewProvider
     {
-        if ($this->provider === 'hmac' && isset($this->fixtureContext['signature_header']) && is_string($this->fixtureContext['signature_header'])) {
-            return new GenericHmacProvider(
-                $this->fixtureContext['signature_header'],
-                (string) $this->configValue('preview.hmac.secret', 'preview-secret'),
-                isset($this->fixtureContext['algorithm']) && is_string($this->fixtureContext['algorithm'])
-                    ? $this->fixtureContext['algorithm']
-                    : (string) $this->configValue('preview.hmac.algorithm', 'sha256'),
-            );
-        }
-
-        return $registry->get($this->provider);
-    }
-
-    private function configValue(string $key, mixed $default): mixed
-    {
-        if (! function_exists('app') || ! function_exists('config')) {
-            return $default;
-        }
-
-        try {
-            $app = app();
-
-            if (method_exists($app, 'bound') && $app->bound('config')) {
-                return config($key, $default);
-            }
-        } catch (\Throwable) {
-            return $default;
-        }
-
-        return $default;
+        return $registry->get($this->provider, $this->fixtureContext);
     }
 
     private static function fromConfiguredPath(string $provider, string $name): self
