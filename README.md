@@ -16,6 +16,13 @@ composer require --dev oxhq/preview
 php artisan vendor:publish --tag=preview-config
 ```
 
+Local readiness summary:
+
+```bash
+php artisan preview:doctor
+php artisan preview:doctor --json
+```
+
 Before the package is published, install it from a Laravel app through a Composer path repository:
 
 ```json
@@ -106,6 +113,10 @@ php artisan preview:capture:show {capture}
 php artisan preview:capture:doctor
 php artisan preview:capture:doctor --capture={capture}
 php artisan preview:capture:doctor --json
+php artisan preview:capture:stats
+php artisan preview:capture:stats --json
+php artisan preview:capture:verify {capture}
+php artisan preview:capture:verify {capture} --json
 php artisan preview:capture:replay {capture} --exact
 php artisan preview:capture:replay {capture} --exact --json
 php artisan preview:capture:replay {capture} --resign
@@ -122,6 +133,10 @@ headers such as cookies and authorization values.
 `preview:capture:doctor` checks capture metadata, raw body files, raw header files,
 registered provider references, and redaction state without printing raw payloads or
 secret header values.
+`preview:capture:verify` re-runs provider verification against the stored raw body and
+raw headers, so redacted metadata cannot accidentally change the verification result.
+`preview:capture:stats` summarizes the local capture inventory by provider, event type,
+verification state, and capture time range.
 Capture pruning requires an explicit date cutoff and only deletes directories resolved
 inside the configured capture storage root. Use `--dry-run` first when inspecting local
 state.
@@ -141,6 +156,13 @@ php artisan preview:transport:doctor --json
 
 `preview:transport:doctor` checks configured transport binaries without opening tunnels
 or touching the network.
+
+Generated fixture manifests can be listed without reading payload files:
+
+```bash
+php artisan preview:fixture:list
+php artisan preview:fixture:list --json
+```
 
 ## Route Preview
 
@@ -237,6 +259,8 @@ php artisan preview:scenario:show subscription-renewal
 php artisan preview:scenario:show subscription-renewal --json
 php artisan preview:scenario:validate subscription-renewal
 php artisan preview:scenario:validate subscription-renewal --json
+php artisan preview:scenario:validate --all
+php artisan preview:scenario:validate --all --json
 php artisan preview:scenario:replay subscription-renewal --exact
 php artisan preview:scenario:replay subscription-renewal --exact --json
 php artisan preview:scenario:replay subscription-renewal --resign

@@ -14,7 +14,8 @@ use RuntimeException;
 final class ScenarioValidateCommand extends Command
 {
     protected $signature = 'preview:scenario:validate
-        {scenario : Scenario name}
+        {scenario? : Scenario name}
+        {--all : Validate every local scenario}
         {--json : Emit machine-readable JSON instead of text output}';
 
     protected $description = 'Validate local Laravel Preview scenario references without replaying traffic.';
@@ -29,8 +30,17 @@ final class ScenarioValidateCommand extends Command
 
     public function handle(): int
     {
-        $name = (string) $this->argument('scenario');
+        $name = (string) ($this->argument('scenario') ?? '');
+        $all = (bool) $this->option('all');
         $json = (bool) $this->option('json');
+
+        if ($all) {
+            return $this->handleAll($json);
+        }
+
+        if ($name === '') {
+            return $this->finish($name, ['Pass a scenario name or --all.'], [], $json);
+        }
 
         try {
             $scenario = $this->scenarios->find($name);
@@ -48,23 +58,34 @@ final class ScenarioValidateCommand extends Command
             return $this->finish($scenario->name, $errors, $warnings, true);
         }
 
-        $this->line("Scenario validation: {$scenario->name}");
-
-        foreach ($ok as $line) {
-            $this->line("OK {$line}");
-        }
-
-        foreach ($warnings as $warning) {
-            $this->warn("WARN {$warning}");
-        }
-
-        foreach ($errors as $error) {
-            $this->error("FAIL {$error}");
-        }
-
-        $this->line($errors === [] ? 'Scenario valid.' : 'Scenario invalid.');
+        $this->printScenarioResult($scenario->name, $errors, $warnings, $ok);
 
         return $errors === [] ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function handleAll(bool $json): int
+    {
+        try {
+            $scenarios = $this->scenarios->all();
+        } catch (RuntimeException $exception) {
+            return $this->finishAll([], [$exception->getMessage()], $json);
+        }
+
+        $rows = [];
+
+        foreach ($scenarios as $scenario) {
+            [$errors, $warnings, $ok] = $this->validate($scenario);
+
+            $rows[] = [
+                'scenario' => $scenario->name,
+                'valid' => $errors === [],
+                'errors' => $errors,
+                'warnings' => $warnings,
+                'ok' => $ok,
+            ];
+        }
+
+        return $this->finishAll($rows, [], $json);
     }
 
     /**
@@ -206,5 +227,72 @@ final class ScenarioValidateCommand extends Command
         }
 
         return $errors === [] ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * @param list<array{scenario: string, valid: bool, errors: list<string>, warnings: list<string>, ok: list<string>}> $rows
+     * @param list<string> $errors
+     */
+    private function finishAll(array $rows, array $errors, bool $json): int
+    {
+        $valid = $errors === [] && ! in_array(false, array_column($rows, 'valid'), true);
+
+        if ($json) {
+            $this->line(json_encode([
+                'valid' => $valid,
+                'rows' => array_map(
+                    fn (array $row): array => [
+                        'scenario' => $row['scenario'],
+                        'valid' => $row['valid'],
+                        'errors' => $row['errors'],
+                        'warnings' => $row['warnings'],
+                    ],
+                    $rows,
+                ),
+                'errors' => $errors,
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+
+            return $valid ? self::SUCCESS : self::FAILURE;
+        }
+
+        foreach ($errors as $error) {
+            $this->error($error);
+        }
+
+        foreach ($rows as $index => $row) {
+            if ($index > 0) {
+                $this->newLine();
+            }
+
+            $this->printScenarioResult($row['scenario'], $row['errors'], $row['warnings'], $row['ok']);
+        }
+
+        $this->line($valid ? 'All scenarios valid.' : 'Scenarios invalid.');
+
+        return $valid ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * @param list<string> $errors
+     * @param list<string> $warnings
+     * @param list<string> $ok
+     */
+    private function printScenarioResult(string $scenario, array $errors, array $warnings, array $ok): void
+    {
+        $this->line("Scenario validation: {$scenario}");
+
+        foreach ($ok as $line) {
+            $this->line("OK {$line}");
+        }
+
+        foreach ($warnings as $warning) {
+            $this->warn("WARN {$warning}");
+        }
+
+        foreach ($errors as $error) {
+            $this->error("FAIL {$error}");
+        }
+
+        $this->line($errors === [] ? 'Scenario valid.' : 'Scenario invalid.');
     }
 }

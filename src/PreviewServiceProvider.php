@@ -13,7 +13,11 @@ use Oxhq\Preview\Commands\CaptureListCommand;
 use Oxhq\Preview\Commands\CapturePruneCommand;
 use Oxhq\Preview\Commands\CaptureReplayCommand;
 use Oxhq\Preview\Commands\CaptureShowCommand;
+use Oxhq\Preview\Commands\CaptureStatsCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
+use Oxhq\Preview\Commands\CaptureVerifyCommand;
+use Oxhq\Preview\Commands\FixtureListCommand;
+use Oxhq\Preview\Commands\PreviewDoctorCommand;
 use Oxhq\Preview\Commands\ProviderDoctorCommand;
 use Oxhq\Preview\Commands\ProviderListCommand;
 use Oxhq\Preview\Commands\RouteListCommand;
@@ -197,7 +201,11 @@ class PreviewServiceProvider extends ServiceProvider
                 CapturePruneCommand::class,
                 CaptureReplayCommand::class,
                 CaptureShowCommand::class,
+                CaptureStatsCommand::class,
                 CaptureTestCommand::class,
+                CaptureVerifyCommand::class,
+                FixtureListCommand::class,
+                PreviewDoctorCommand::class,
                 ProviderDoctorCommand::class,
                 ProviderListCommand::class,
                 RouteListCommand::class,

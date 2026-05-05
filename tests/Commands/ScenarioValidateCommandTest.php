@@ -28,8 +28,11 @@ final class ScenarioValidateCommandTest extends TestCase
         $this->app['config']->set('preview.scenario_path', $path);
         $capture = $this->storeGenericCapture('/webhooks/orders');
 
-        Route::get('/validation/orders/{order}', fn (string $order): string => $order)
-            ->name('preview.validation.orders.show');
+        Route::get('/validation/orders/{order}', function (string $order): string {
+            ValidationCommandRouteProbe::$hits++;
+
+            return $order;
+        })->name('preview.validation.orders.show');
 
         $this->writeScenario($path, 'valid.php', sprintf(<<<'PHP'
 <?php
@@ -107,6 +110,112 @@ PHP);
         $this->assertContains('Route [preview.validation.missing] was not found.', $payload['errors']);
         $this->assertContains('Route expectation [preview.validation.not-in-scenario] does not reference a route in scenario [broken-flow].', $payload['errors']);
         $this->assertSame([], $payload['warnings']);
+    }
+
+    public function test_preview_scenario_validate_all_prints_each_scenario_and_overall_status(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+        $capture = $this->storeGenericCapture('/webhooks/orders');
+
+        Route::get('/validation/orders/{order}', function (string $order): string {
+            ValidationCommandRouteProbe::$hits++;
+
+            return $order;
+        })->name('preview.validation.orders.show');
+
+        $this->writeScenario($path, 'valid.php', sprintf(<<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+use Oxhq\Preview\Tests\Commands\ValidationCommandRecordingSeeder;
+
+return new Scenario(
+    name: 'valid-flow',
+    seed: ValidationCommandRecordingSeeder::class,
+    routes: ['preview.validation.orders.show'],
+    routeParameters: [
+        'preview.validation.orders.show' => ['order' => 'ord_123'],
+    ],
+    captures: ['%s'],
+);
+PHP, $capture->id));
+
+        $this->writeScenario($path, 'broken.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'broken-flow',
+    captures: ['missing-capture'],
+);
+PHP);
+
+        $this->artisan('preview:scenario:validate', ['--all' => true])
+            ->expectsOutput('Scenario validation: broken-flow')
+            ->expectsOutput('OK seed: none')
+            ->expectsOutput('OK routes: none')
+            ->expectsOutput('FAIL Capture [missing-capture] was not found.')
+            ->expectsOutput('Scenario invalid.')
+            ->expectsOutput('Scenario validation: valid-flow')
+            ->expectsOutput('OK seed: '.ValidationCommandRecordingSeeder::class)
+            ->expectsOutput("OK capture: {$capture->id}")
+            ->expectsOutput('OK route: preview.validation.orders.show')
+            ->expectsOutput('Scenario valid.')
+            ->expectsOutput('Scenarios invalid.')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, ValidationCommandRecordingSeeder::$runs);
+        $this->assertSame(0, ValidationCommandRouteProbe::$hits);
+    }
+
+    public function test_preview_scenario_validate_all_reports_rows_and_aggregate_status_as_json(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+
+        $this->writeScenario($path, 'valid.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+use Oxhq\Preview\Tests\Commands\ValidationCommandRecordingSeeder;
+
+return new Scenario(
+    name: 'valid-flow',
+    seed: ValidationCommandRecordingSeeder::class,
+);
+PHP);
+
+        $this->writeScenario($path, 'broken.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'broken-flow',
+    seed: 'Oxhq\\Preview\\Tests\\Commands\\MissingValidationSeeder',
+);
+PHP);
+
+        [$exitCode, $output] = $this->runValidateJson([
+            '--all' => true,
+            '--json' => true,
+        ]);
+
+        $payload = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertFalse($payload['valid']);
+        $this->assertCount(2, $payload['rows']);
+        $this->assertSame('broken-flow', $payload['rows'][0]['scenario']);
+        $this->assertFalse($payload['rows'][0]['valid']);
+        $this->assertSame(['Scenario seed [Oxhq\\Preview\\Tests\\Commands\\MissingValidationSeeder] was not found.'], $payload['rows'][0]['errors']);
+        $this->assertSame([], $payload['rows'][0]['warnings']);
+        $this->assertSame('valid-flow', $payload['rows'][1]['scenario']);
+        $this->assertTrue($payload['rows'][1]['valid']);
+        $this->assertSame([], $payload['rows'][1]['errors']);
+        $this->assertSame([], $payload['rows'][1]['warnings']);
     }
 
     public function test_preview_scenario_validate_does_not_execute_routes_or_seeds(): void
