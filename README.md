@@ -414,6 +414,7 @@ composer smoke:cloudflared -- -RequireDns
 composer smoke:provider-signatures
 $env:PREVIEW_STRIPE_ENDPOINT_SECRET = 'whsec_...'
 composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed
+composer smoke:stripe-cli -- -StripeBinary C:\Users\you\stripe.exe -StartServer -TriggerEvent checkout.session.completed
 ```
 
 `composer smoke:consumer` creates a disposable Laravel app, installs `oxhq/preview`
@@ -431,8 +432,12 @@ checks that the generated hostname resolves.
 process-local secrets, captures them, verifies them, builds exact and resign replay
 payloads, writes fixture and Pest files, lints the generated PHP, and deletes the
 temporary proof directory unless called with `-KeepWorkDir`.
-`composer smoke:stripe-cli` is the real Stripe CLI proof path and requires Stripe CLI auth
-plus `PREVIEW_STRIPE_ENDPOINT_SECRET`. It redacts endpoint secrets from output.
+`composer smoke:stripe-cli` is the real Stripe CLI proof path. It requires Stripe CLI
+auth, accepts `-StripeBinary` or `PREVIEW_STRIPE_CLI_BINARY` when `stripe` is not on
+`PATH`, can derive `PREVIEW_STRIPE_ENDPOINT_SECRET` with `stripe listen --print-secret`,
+and redacts endpoint secrets from output. Passing `-StartServer` starts a local Testbench
+HTTP server and verifies that the triggered Stripe event becomes a verified Preview
+capture.
 
 ## License
 

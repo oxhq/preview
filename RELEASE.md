@@ -25,8 +25,10 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
   - `composer smoke:provider-signatures`
   - confirm exact replay, resign replay, fixture generation, and generated Pest file linting pass for both providers
 - Run the Stripe CLI proof path against the consumer app:
-  - set `PREVIEW_STRIPE_ENDPOINT_SECRET`
+  - set `PREVIEW_STRIPE_ENDPOINT_SECRET` or let the smoke derive it with `stripe listen --print-secret`
   - run `composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed`
+  - if Stripe CLI is not on `PATH`, pass `-StripeBinary C:\Users\you\stripe.exe`
+  - for a package-local receive/capture proof, pass `-StartServer`
   - confirm Laravel Preview captures the event locally
   - replay or generate a test from the captured event
 - Confirm GitHub Actions CI is green for the exact commit that will be tagged.
