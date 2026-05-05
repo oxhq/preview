@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Oxhq\Preview\Tests\Commands;
 
+use Illuminate\Support\Facades\Artisan;
 use Oxhq\Preview\Tests\TestCase;
 
 final class ScenarioTestCommandTest extends TestCase
@@ -129,6 +130,38 @@ PHP);
         $this->artisan('preview:scenario:test', ['scenario' => 'missing-flow'])
             ->expectsOutput('Scenario [missing-flow] was not found.')
             ->assertExitCode(1);
+    }
+
+    public function test_preview_scenario_test_json_outputs_generated_test_metadata(): void
+    {
+        $scenarioPath = $this->scenarioPath();
+        $testPath = sys_get_temp_dir().'/preview-tests/generated-scenario-json-tests/'.spl_object_id($this);
+        $this->app['config']->set('preview.scenario_path', $scenarioPath);
+        $this->app['config']->set('preview.test_path', $testPath);
+
+        $this->writeScenario($scenarioPath, 'checkout.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(name: 'checkout-flow');
+PHP);
+
+        $exitCode = Artisan::call('preview:scenario:test', [
+            'scenario' => 'checkout-flow',
+            '--json' => true,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+        $generated = $testPath.'/Preview/Scenario/checkout-flowTest.php';
+
+        $this->assertSame('checkout-flow', $payload['scenario']);
+        $this->assertSame(str_replace('\\', '/', $generated), str_replace('\\', '/', $payload['test_path']));
+        $this->assertFileExists($generated);
+        $this->assertStringNotContainsString('Pest test generated for scenario', Artisan::output());
+        $this->assertStringNotContainsString('Path:', Artisan::output());
     }
 
     private function scenarioPath(): string

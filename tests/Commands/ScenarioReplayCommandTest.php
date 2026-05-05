@@ -196,6 +196,54 @@ PHP, $capture->id));
         $this->assertSame([], $payload['routes']);
     }
 
+    public function test_preview_scenario_replay_json_includes_safe_route_summaries_on_route_failure(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+
+        Route::get('/checkout/ready', fn (): string => 'ready')
+            ->name('checkout.ready');
+        Route::get('/checkout/failing', fn () => response('sensitive failure body', 503))
+            ->name('checkout.failing');
+
+        $this->writeScenario($path, 'route-summary-failure.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'route-summary-failure',
+    routes: ['checkout.ready', 'checkout.failing'],
+);
+PHP);
+
+        [$exitCode, $output] = $this->runReplayJson([
+            'scenario' => 'route-summary-failure',
+            '--exact' => true,
+            '--json' => true,
+        ]);
+
+        $payload = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertFalse($payload['successful']);
+        $this->assertSame('Scenario replay failed: route [checkout.failing] returned HTTP 503.', $payload['failure']);
+        $this->assertSame([
+            [
+                'name' => 'checkout.ready',
+                'status_code' => 200,
+                'successful' => true,
+            ],
+            [
+                'name' => 'checkout.failing',
+                'status_code' => 503,
+                'successful' => false,
+            ],
+        ], $payload['route_summaries']);
+        $this->assertArrayNotHasKey('output', $payload['route_summaries'][1]);
+        $this->assertArrayNotHasKey('url', $payload['route_summaries'][1]);
+    }
+
     public function test_preview_scenario_replay_rejects_missing_scenarios_clearly(): void
     {
         $this->app['config']->set('preview.scenario_path', $this->scenarioPath());

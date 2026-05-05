@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('stripe', 'github')]
-    [string[]] $Provider = @('stripe', 'github'),
+    [ValidateSet('stripe', 'github', 'shopify')]
+    [string[]] $Provider = @('stripe', 'github', 'shopify'),
 
     [string] $PackageRoot = '',
 
@@ -77,7 +77,8 @@ function Redact-SmokeOutput {
         [AllowNull()]
         [string] $Text,
         [string] $StripeSecret,
-        [string] $GitHubSecret
+        [string] $GitHubSecret,
+        [string] $ShopifySecret
     )
 
     if ([string]::IsNullOrEmpty($Text)) {
@@ -86,7 +87,7 @@ function Redact-SmokeOutput {
 
     $redacted = $Text
 
-    foreach ($secret in @($StripeSecret, $GitHubSecret)) {
+    foreach ($secret in @($StripeSecret, $GitHubSecret, $ShopifySecret)) {
         if (-not [string]::IsNullOrWhiteSpace($secret)) {
             $redacted = $redacted.Replace($secret, '[redacted-provider-secret]')
         }
@@ -95,6 +96,8 @@ function Redact-SmokeOutput {
     $redacted = $redacted -replace 'whsec_[A-Za-z0-9_]+', 'whsec_[redacted]'
     $redacted = $redacted -replace 'sha256=[a-f0-9]{64}', 'sha256=[redacted]'
     $redacted = $redacted -replace 't=\d+,v1=[a-f0-9]{64}', 't=[redacted],v1=[redacted]'
+    $redacted = $redacted -replace '(?i)("X-Shopify-Hmac-Sha256"\s*:\s*")[^"]+(")', '$1[redacted]$2'
+    $redacted = $redacted -replace '(?i)(X-Shopify-Hmac-Sha256:\s*)[A-Za-z0-9+/=]+', '$1[redacted]'
 
     return $redacted
 }
@@ -114,7 +117,9 @@ function Invoke-PreviewCommand {
         [Parameter(Mandatory)]
         [string] $StripeSecret,
         [Parameter(Mandatory)]
-        [string] $GitHubSecret
+        [string] $GitHubSecret,
+        [Parameter(Mandatory)]
+        [string] $ShopifySecret
     )
 
     Write-Smoke $Label
@@ -138,7 +143,7 @@ function Invoke-PreviewCommand {
     $output = ($outputObjects | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
 
     if ($exitCode -ne 0) {
-        $safeOutput = Redact-SmokeOutput -Text $output -StripeSecret $StripeSecret -GitHubSecret $GitHubSecret
+        $safeOutput = Redact-SmokeOutput -Text $output -StripeSecret $StripeSecret -GitHubSecret $GitHubSecret -ShopifySecret $ShopifySecret
         throw "$Label failed with exit code $exitCode.$([Environment]::NewLine)$safeOutput"
     }
 
@@ -170,11 +175,13 @@ function Get-SampleEvent {
         [string] $Provider
     )
 
-    if ($Provider -eq 'stripe') {
-        return 'checkout.session.completed'
+    switch ($Provider) {
+        'stripe' { return 'checkout.session.completed' }
+        'github' { return 'pull_request' }
+        'shopify' { return 'orders/create' }
     }
 
-    return 'pull_request'
+    throw "Unsupported provider [$Provider]."
 }
 
 $scriptRoot = if ($PSScriptRoot -ne '') {
@@ -204,9 +211,11 @@ $previousFixturePath = [Environment]::GetEnvironmentVariable('PREVIEW_FIXTURE_PA
 $previousTestPath = [Environment]::GetEnvironmentVariable('PREVIEW_TEST_PATH', 'Process')
 $previousStripeSecret = [Environment]::GetEnvironmentVariable('PREVIEW_STRIPE_ENDPOINT_SECRET', 'Process')
 $previousGitHubSecret = [Environment]::GetEnvironmentVariable('PREVIEW_GITHUB_WEBHOOK_SECRET', 'Process')
+$previousShopifySecret = [Environment]::GetEnvironmentVariable('PREVIEW_SHOPIFY_CLIENT_SECRET', 'Process')
 
 $stripeSecret = if ([string]::IsNullOrWhiteSpace($previousStripeSecret)) { 'whsec_preview_signature_smoke' } else { $previousStripeSecret }
 $githubSecret = if ([string]::IsNullOrWhiteSpace($previousGitHubSecret)) { 'github-preview-signature-smoke-secret' } else { $previousGitHubSecret }
+$shopifySecret = if ([string]::IsNullOrWhiteSpace($previousShopifySecret)) { 'shopify-preview-signature-smoke-secret' } else { $previousShopifySecret }
 
 try {
     if (Test-Path -LiteralPath $safeWorkDir) {
@@ -220,6 +229,7 @@ try {
     [Environment]::SetEnvironmentVariable('PREVIEW_TEST_PATH', $testPath, 'Process')
     [Environment]::SetEnvironmentVariable('PREVIEW_STRIPE_ENDPOINT_SECRET', $stripeSecret, 'Process')
     [Environment]::SetEnvironmentVariable('PREVIEW_GITHUB_WEBHOOK_SECRET', $githubSecret, 'Process')
+    [Environment]::SetEnvironmentVariable('PREVIEW_SHOPIFY_CLIENT_SECRET', $shopifySecret, 'Process')
 
     $php = Get-CommandPath -Name 'php'
     $testbench = Join-Path $resolvedPackageRoot 'vendor/bin/testbench'
@@ -242,7 +252,8 @@ try {
             -WorkingDirectory $resolvedPackageRoot `
             -Label "Run $providerName provider self-test" `
             -StripeSecret $stripeSecret `
-            -GitHubSecret $githubSecret | Out-Null
+            -GitHubSecret $githubSecret `
+            -ShopifySecret $shopifySecret | Out-Null
         $proof.Add("$providerName self-test verifies synthetic signed request")
 
         $sampleOutput = Invoke-PreviewCommand `
@@ -252,7 +263,8 @@ try {
             -WorkingDirectory $resolvedPackageRoot `
             -Label "Generate $providerName signed sample" `
             -StripeSecret $stripeSecret `
-            -GitHubSecret $githubSecret
+            -GitHubSecret $githubSecret `
+            -ShopifySecret $shopifySecret
 
         $sample = $sampleOutput | ConvertFrom-Json
         $headers = @()
@@ -277,7 +289,8 @@ try {
             -WorkingDirectory $resolvedPackageRoot `
             -Label "Capture $providerName signed sample" `
             -StripeSecret $stripeSecret `
-            -GitHubSecret $githubSecret
+            -GitHubSecret $githubSecret `
+            -ShopifySecret $shopifySecret
 
         $captureMatch = [regex]::Match($captureOutput, 'Captured \[(?<id>[^\]]+)\]')
 
@@ -295,7 +308,8 @@ try {
             -WorkingDirectory $resolvedPackageRoot `
             -Label "Show $providerName capture metadata" `
             -StripeSecret $stripeSecret `
-            -GitHubSecret $githubSecret
+            -GitHubSecret $githubSecret `
+            -ShopifySecret $shopifySecret
 
         $show = $showOutput | ConvertFrom-Json
 
@@ -315,7 +329,8 @@ try {
                 -WorkingDirectory $resolvedPackageRoot `
                 -Label "Build $providerName $mode replay payload" `
                 -StripeSecret $stripeSecret `
-                -GitHubSecret $githubSecret
+                -GitHubSecret $githubSecret `
+                -ShopifySecret $shopifySecret
 
             $replay = $replayOutput | ConvertFrom-Json
 
@@ -333,7 +348,8 @@ try {
             -WorkingDirectory $resolvedPackageRoot `
             -Label "Generate $providerName fixture" `
             -StripeSecret $stripeSecret `
-            -GitHubSecret $githubSecret
+            -GitHubSecret $githubSecret `
+            -ShopifySecret $shopifySecret
 
         $fixture = $fixtureOutput | ConvertFrom-Json
         Invoke-PhpLint -Php $php -Path $fixture.fixture_path
@@ -346,7 +362,8 @@ try {
             -WorkingDirectory $resolvedPackageRoot `
             -Label "Generate $providerName Pest test" `
             -StripeSecret $stripeSecret `
-            -GitHubSecret $githubSecret
+            -GitHubSecret $githubSecret `
+            -ShopifySecret $shopifySecret
 
         $test = $testOutput | ConvertFrom-Json
         Invoke-PhpLint -Php $php -Path $test.test_path
@@ -364,6 +381,7 @@ try {
     [Environment]::SetEnvironmentVariable('PREVIEW_TEST_PATH', $previousTestPath, 'Process')
     [Environment]::SetEnvironmentVariable('PREVIEW_STRIPE_ENDPOINT_SECRET', $previousStripeSecret, 'Process')
     [Environment]::SetEnvironmentVariable('PREVIEW_GITHUB_WEBHOOK_SECRET', $previousGitHubSecret, 'Process')
+    [Environment]::SetEnvironmentVariable('PREVIEW_SHOPIFY_CLIENT_SECRET', $previousShopifySecret, 'Process')
 
     if ($KeepWorkDir) {
         Write-Host ''

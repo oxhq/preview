@@ -267,10 +267,25 @@ final class ScenarioReplayCommand extends Command
                     'expectation_failure' => $failure,
                 ];
             }, $result->routes),
+            'route_summaries' => $this->routeSummaries($result),
             'summary' => $result->summaryCounts(),
             'successful' => $failure === null,
             'failure' => $failure,
         ];
+    }
+
+    /**
+     * @return list<array{name: string, status_code: int|null, successful: bool}>
+     */
+    private function routeSummaries(ScenarioReplayResult $result): array
+    {
+        return array_map(function (ScenarioRouteResult $route) use ($result): array {
+            return [
+                'name' => $route->preview->name,
+                'status_code' => $route->response->getStatusCode(),
+                'successful' => $this->routeFailure($result, $route) === null,
+            ];
+        }, $result->routes);
     }
 
     /**
@@ -309,6 +324,7 @@ final class ScenarioReplayCommand extends Command
             'captures' => [],
             'dispatches' => [],
             'routes' => [],
+            'route_summaries' => [],
             'summary' => [
                 'seed' => 0,
                 'captures' => 0,

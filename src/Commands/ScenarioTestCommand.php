@@ -11,7 +11,9 @@ use RuntimeException;
 
 final class ScenarioTestCommand extends Command
 {
-    protected $signature = 'preview:scenario:test {scenario : Scenario name}';
+    protected $signature = 'preview:scenario:test
+        {scenario : Scenario name}
+        {--json : Emit machine-readable JSON output}';
 
     protected $description = 'Generate a Pest-compatible test for a local Laravel Preview scenario.';
 
@@ -48,9 +50,26 @@ final class ScenarioTestCommand extends Command
             return self::FAILURE;
         }
 
+        if ((bool) $this->option('json')) {
+            $this->line($this->json([
+                'scenario' => $scenario->name,
+                'test_path' => $path,
+            ]));
+
+            return self::SUCCESS;
+        }
+
         $this->info("Pest test generated for scenario [{$scenario->name}].");
         $this->line("Path: {$path}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param array<string, mixed> $value
+     */
+    private function json(array $value): string
+    {
+        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 }

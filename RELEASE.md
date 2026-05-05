@@ -8,6 +8,7 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
   - `composer ci`
   - `composer release:commands`
   - `composer release:dist`
+  - `composer release:powershell`
   - `composer release:public-surface`
 - After the release candidate is committed, confirm the GitHub source archive surface:
   - `composer release:source`
@@ -21,9 +22,13 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
 - Run a tunnel startup smoke with a local tunnel binary:
   - `composer smoke:tunnel`
   - `composer smoke:cloudflared -- -RequireDns`
+  - `composer smoke:ngrok`
+- Run a public ingress smoke with a local tunnel binary:
+  - `composer smoke:ingress -- -Transport cloudflare -RequireDns`
+  - confirm the synthetic request sent through the public URL is stored as a local capture
 - Run the signed-provider smoke for local Stripe and GitHub provider proof:
   - `composer smoke:provider-signatures`
-  - confirm exact replay, resign replay, fixture generation, and generated Pest file linting pass for both providers
+  - confirm exact replay, resign replay, fixture generation, and generated Pest file linting pass for Stripe, GitHub, and Shopify
 - Run the Stripe CLI proof path against the consumer app:
   - set `PREVIEW_STRIPE_ENDPOINT_SECRET` or let the smoke derive it with `stripe listen --print-secret`
   - run `composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed`
