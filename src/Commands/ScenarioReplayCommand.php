@@ -7,6 +7,7 @@ namespace Oxhq\Preview\Commands;
 use Illuminate\Console\Command;
 use Oxhq\Preview\Capture\ReplayResult;
 use Oxhq\Preview\Scenario\ScenarioReplayResult;
+use Oxhq\Preview\Scenario\ScenarioRouteResult;
 use Oxhq\Preview\Scenario\ScenarioRunner;
 use Throwable;
 
@@ -16,7 +17,8 @@ final class ScenarioReplayCommand extends Command
         {scenario : Scenario name}
         {--exact : Replay captured headers and body exactly}
         {--resign : Replay with provider-fresh signed headers}
-        {--send-to= : Optional absolute target base URL or full URL to dispatch each replay over HTTP}';
+        {--send-to= : Optional absolute target base URL or full URL to dispatch each replay over HTTP}
+        {--json : Emit machine-readable JSON instead of text output}';
 
     protected $description = 'Replay captures from a local Laravel Preview scenario.';
 
@@ -30,14 +32,22 @@ final class ScenarioReplayCommand extends Command
     {
         $exact = (bool) $this->option('exact');
         $resign = (bool) $this->option('resign');
+        $json = (bool) $this->option('json');
+        $scenarioName = (string) $this->argument('scenario');
+        $requestedMode = $resign ? 'resign' : ($exact ? 'exact' : null);
 
         if ($exact === $resign) {
-            $this->error('Choose exactly one scenario replay mode: --exact or --resign.');
+            $message = 'Choose exactly one scenario replay mode: --exact or --resign.';
+
+            if ($json) {
+                $this->line($this->encodeJson($this->failurePayload($scenarioName, $requestedMode, $message)));
+            } else {
+                $this->error($message);
+            }
 
             return self::FAILURE;
         }
 
-        $scenarioName = (string) $this->argument('scenario');
         $mode = $resign ? 'resign' : 'exact';
 
         try {
@@ -47,10 +57,24 @@ final class ScenarioReplayCommand extends Command
                 is_string($this->option('send-to')) ? (string) $this->option('send-to') : null,
             );
         } catch (Throwable $exception) {
+            if ($json) {
+                $this->line($this->encodeJson($this->failurePayload($scenarioName, $mode, $exception->getMessage())));
+
+                return self::FAILURE;
+            }
+
             $this->error($exception->getMessage());
             $this->error("Scenario replay failed before a result was available for [{$scenarioName}] using [{$mode}].");
 
             return self::FAILURE;
+        }
+
+        $failure = $this->failureFor($result);
+
+        if ($json) {
+            $this->line($this->encodeJson($this->jsonPayload($result, $failure)));
+
+            return $failure === null ? self::SUCCESS : self::FAILURE;
         }
 
         $this->info("Scenario replay ready for [{$result->scenario->name}] using [{$result->mode}].");
@@ -62,8 +86,6 @@ final class ScenarioReplayCommand extends Command
         if ($result->captures === []) {
             $this->line('Captures: none');
         }
-
-        $failure = null;
 
         foreach ($result->captures as $index => $payload) {
             $this->line(sprintf(
@@ -80,11 +102,7 @@ final class ScenarioReplayCommand extends Command
                 $this->line('Replay dispatch: '.($dispatch->successful() ? 'success' : 'failure'));
 
                 if (! $dispatch->successful()) {
-                    $failure ??= sprintf(
-                        'Scenario replay failed: dispatch for capture [%s] returned HTTP %d.',
-                        (string) $payload['id'],
-                        $dispatch->statusCode,
-                    );
+                    $failure ??= $this->dispatchFailure($payload, $dispatch);
                 }
             }
         }
@@ -103,7 +121,7 @@ final class ScenarioReplayCommand extends Command
             }
 
             if (! $route->successful()) {
-                $failure ??= "Scenario replay failed: route [{$route->preview->name}] returned HTTP {$statusCode}.";
+                $failure ??= $this->routeFailure($route);
             }
         }
 
@@ -121,5 +139,138 @@ final class ScenarioReplayCommand extends Command
     private function printSummary(ScenarioReplayResult $result): void
     {
         $this->line($result->summaryLine());
+    }
+
+    private function failureFor(ScenarioReplayResult $result): ?string
+    {
+        foreach ($result->captures as $index => $payload) {
+            $dispatch = $result->dispatches[$index] ?? null;
+
+            if ($dispatch instanceof ReplayResult && ! $dispatch->successful()) {
+                return $this->dispatchFailure($payload, $dispatch);
+            }
+        }
+
+        foreach ($result->routes as $route) {
+            if (! $route->successful()) {
+                return $this->routeFailure($route);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function dispatchFailure(array $payload, ReplayResult $dispatch): string
+    {
+        return sprintf(
+            'Scenario replay failed: dispatch for capture [%s] returned HTTP %d.',
+            (string) $payload['id'],
+            $dispatch->statusCode,
+        );
+    }
+
+    private function routeFailure(ScenarioRouteResult $route): string
+    {
+        return "Scenario replay failed: route [{$route->preview->name}] returned HTTP {$route->response->getStatusCode()}.";
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonPayload(ScenarioReplayResult $result, ?string $failure): array
+    {
+        $captures = [];
+        $dispatches = [];
+
+        foreach ($result->captures as $index => $payload) {
+            $dispatch = $result->dispatches[$index] ?? null;
+            $dispatchPayload = $dispatch instanceof ReplayResult
+                ? $this->dispatchPayload($dispatch, (string) $payload['id'])
+                : null;
+
+            $captures[] = [
+                'id' => (string) $payload['id'],
+                'provider' => (string) $payload['provider'],
+                'event_type' => isset($payload['event_type']) ? (string) $payload['event_type'] : null,
+                'mode' => (string) $payload['mode'],
+                'method' => (string) $payload['method'],
+                'path' => (string) $payload['path'],
+                'query' => is_array($payload['query'] ?? null) ? $payload['query'] : [],
+                'captured_at' => (string) $payload['captured_at'],
+                'dispatch' => $dispatchPayload,
+            ];
+
+            if ($dispatchPayload !== null) {
+                $dispatches[] = $dispatchPayload;
+            }
+        }
+
+        return [
+            'scenario' => $result->scenario->name,
+            'mode' => $result->mode,
+            'seed' => $result->seed,
+            'captures' => $captures,
+            'dispatches' => $dispatches,
+            'routes' => array_map(fn (ScenarioRouteResult $route): array => [
+                'name' => $route->preview->name,
+                'uri' => $route->preview->uri,
+                'method' => $route->preview->executionMethod,
+                'url' => $route->preview->url,
+                'status_code' => $route->response->getStatusCode(),
+                'output' => trim((string) $route->response->getContent()),
+                'successful' => $route->successful(),
+            ], $result->routes),
+            'summary' => $result->summaryCounts(),
+            'successful' => $failure === null,
+            'failure' => $failure,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function dispatchPayload(ReplayResult $dispatch, string $captureId): array
+    {
+        return [
+            'capture_id' => $captureId,
+            'status_code' => $dispatch->statusCode,
+            'body' => $dispatch->body,
+            'headers' => $dispatch->headers,
+            'successful' => $dispatch->successful(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function failurePayload(string $scenarioName, ?string $mode, string $failure): array
+    {
+        return [
+            'scenario' => $scenarioName,
+            'mode' => $mode,
+            'seed' => null,
+            'captures' => [],
+            'dispatches' => [],
+            'routes' => [],
+            'summary' => [
+                'seed' => 0,
+                'captures' => 0,
+                'dispatches' => 0,
+                'routes' => 0,
+            ],
+            'successful' => false,
+            'failure' => $failure,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function encodeJson(array $payload): string
+    {
+        return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 }

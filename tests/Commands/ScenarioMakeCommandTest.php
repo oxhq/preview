@@ -24,6 +24,8 @@ final class ScenarioMakeCommandTest extends TestCase
             '--route-user' => ['checkout.show:42:App\\Models\\User'],
             '--route-readonly-db' => ['checkout.show'],
             '--route-fake' => ['checkout.show:mail', 'checkout.show:events'],
+            '--route-status' => ['checkout.show=202', 'orders.show=200'],
+            '--route-output-contains' => ['checkout.show=Checkout queued'],
             '--fake' => ['mail', 'queue'],
             '--seed' => 'Database\\Seeders\\CheckoutScenarioSeeder',
             '--note' => 'Happy-path checkout',
@@ -54,6 +56,15 @@ final class ScenarioMakeCommandTest extends TestCase
                 'session' => ['locale' => 'en'],
             ],
         ], $scenario->routeContext);
+        $this->assertSame([
+            'checkout.show' => [
+                'status' => 202,
+                'output_contains' => 'Checkout queued',
+            ],
+            'orders.show' => [
+                'status' => 200,
+            ],
+        ], $scenario->routeExpectations);
         $this->assertSame(['stripe.checkout.completed', 'github.pull_request'], $scenario->captures);
         $this->assertSame(['mail', 'queue'], $scenario->fakes);
         $this->assertSame('Happy-path checkout', $scenario->notes);
@@ -107,6 +118,26 @@ final class ScenarioMakeCommandTest extends TestCase
             '--route-user' => ['checkout.show:42'],
         ])
             ->expectsOutput('Scenario route user [checkout.show:42] must use route:id:model.')
+            ->assertExitCode(1);
+    }
+
+    public function test_preview_scenario_make_rejects_invalid_route_expectation_input(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+
+        $this->artisan('preview:scenario:make', [
+            'name' => 'checkout-flow',
+            '--route-status' => ['checkout.show=99'],
+        ])
+            ->expectsOutput('Scenario route status [checkout.show=99] must use route=HTTP_STATUS with a status between 100 and 599.')
+            ->assertExitCode(1);
+
+        $this->artisan('preview:scenario:make', [
+            'name' => 'checkout-flow',
+            '--route-output-contains' => ['checkout.show=Queued'],
+        ])
+            ->expectsOutput('Scenario route output expectation for [checkout.show] requires --route-status=checkout.show=<status>.')
             ->assertExitCode(1);
     }
 

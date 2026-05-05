@@ -129,6 +129,34 @@ PHP);
         (new ScenarioRepository($path))->all();
     }
 
+    public function test_it_rejects_route_expectations_without_http_statuses_clearly(): void
+    {
+        $path = $this->scenarioPath();
+        $file = $this->writeScenario($path, 'invalid-route-expectation.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'invalid-route-expectation-flow',
+    routes: ['checkout.show'],
+    routeExpectations: [
+        'checkout.show' => [
+            'output_contains' => 'Checkout',
+        ],
+    ],
+);
+PHP);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf(
+            'Scenario file [%s] route [checkout.show] expectation key [status] must be an HTTP status code.',
+            $file,
+        ));
+
+        (new ScenarioRepository($path))->all();
+    }
+
     private function scenarioPath(): string
     {
         return sys_get_temp_dir().'/preview-tests/scenarios/'.spl_object_id($this);

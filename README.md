@@ -60,6 +60,13 @@ Stripe is a high-fidelity reference provider, not the product center. Provider-s
 logic belongs inside provider adapters, not in the capture, replay, fixture, or test
 generation services.
 
+Inspect registered providers without starting any live traffic:
+
+```bash
+php artisan preview:provider:list
+php artisan preview:provider:list --json
+```
+
 ## Capture
 
 Synthetic local capture:
@@ -89,8 +96,10 @@ php artisan preview:capture hmac --signature-header=X-Signature
 php artisan preview:capture stripe
 php artisan preview:capture stripe --transport=stripe-cli --live --local-url=http://127.0.0.1:8000
 php artisan preview:capture:list
+php artisan preview:capture:list --json
 php artisan preview:capture:show {capture}
 php artisan preview:capture:replay {capture} --exact
+php artisan preview:capture:replay {capture} --exact --json
 php artisan preview:capture:replay {capture} --resign
 php artisan preview:capture:fixture {capture}
 php artisan preview:capture:test {capture}
@@ -102,6 +111,13 @@ headers such as cookies and authorization values.
 `stripe-cli` is an optional convenience transport. It starts `stripe listen` and forwards
 Stripe events to the local Preview Stripe capture endpoint. It still requires `--live`,
 `preview.live_enabled=true`, a runnable Stripe CLI binary, and normal Stripe CLI auth.
+
+Inspect configured tunnel transports without opening a tunnel:
+
+```bash
+php artisan preview:transport:list
+php artisan preview:transport:list --json
+```
 
 ## Route Preview
 
@@ -158,6 +174,12 @@ return new Scenario(
             'fakes' => ['mail'],
         ],
     ],
+    routeExpectations: [
+        'billing.portal' => [
+            'status' => 200,
+            'output_contains' => 'Billing',
+        ],
+    ],
     captures: ['20260505011852323-sugxujb2'],
     fakes: ['queue', 'events'],
     notes: 'Exercises renewal review after a provider callback.',
@@ -176,11 +198,14 @@ php artisan preview:scenario:make subscription-renewal \
   --route-guard=billing.portal=web \
   --route-user="billing.portal:42:App\Models\User" \
   --route-readonly-db=billing.portal \
-  --route-fake=billing.portal:mail
+  --route-fake=billing.portal:mail \
+  --route-status=billing.portal=200 \
+  --route-output-contains="billing.portal=Billing"
 
 php artisan preview:scenario:list
 php artisan preview:scenario:show subscription-renewal
 php artisan preview:scenario:replay subscription-renewal --exact
+php artisan preview:scenario:replay subscription-renewal --exact --json
 php artisan preview:scenario:replay subscription-renewal --resign
 php artisan preview:scenario:test subscription-renewal
 ```
@@ -196,6 +221,8 @@ Generated scenario tests are Pest-compatible and local-first. They are meant to 
 clearly when the host app lacks required routes, models, provider secrets, seed data, or
 database state. Generated scenario tests call `ScenarioRunner` directly and assert the
 replay result object instead of only checking command text.
+When route expectations are configured, generated tests assert the expected route status
+and optional response text; otherwise they keep the default 2xx route-success assertion.
 
 ## Proof Boundary
 

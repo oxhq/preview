@@ -25,6 +25,15 @@ final class ScenarioPestTestWriterTest extends TestCase
             ],
             captures: ['cap_checkout_completed', 'cap_order_created'],
             fakes: ['queue', 'events'],
+            routeExpectations: [
+                'checkout.show' => [
+                    'status' => 202,
+                    'output_contains' => 'Checkout queued',
+                ],
+                'checkout.success' => [
+                    'status' => 200,
+                ],
+            ],
             routeContext: [
                 'checkout.show' => [
                     'session' => ['currency' => 'usd', 'tenant' => 'acme'],
@@ -114,11 +123,10 @@ final class ScenarioPestTestWriterTest extends TestCase
         );
         $this->assertStringContainsString('$this->assertCount(2, $result->routes);', $contents);
         $this->assertStringContainsString("\$this->assertSame('checkout.show', \$result->routes[0]->preview->name);", $contents);
-        $this->assertStringContainsString('$this->assertTrue($result->routes[0]->successful());', $contents);
-        $this->assertStringContainsString('$this->assertGreaterThanOrEqual(200, $result->routes[0]->response->getStatusCode());', $contents);
-        $this->assertStringContainsString('$this->assertLessThan(300, $result->routes[0]->response->getStatusCode());', $contents);
+        $this->assertStringContainsString('$this->assertSame(202, $result->routes[0]->response->getStatusCode());', $contents);
+        $this->assertStringContainsString("\$this->assertStringContainsString('Checkout queued', (string) \$result->routes[0]->response->getContent());", $contents);
         $this->assertStringContainsString("\$this->assertSame('checkout.success', \$result->routes[1]->preview->name);", $contents);
-        $this->assertStringContainsString('$this->assertTrue($result->routes[1]->successful());', $contents);
+        $this->assertStringContainsString('$this->assertSame(200, $result->routes[1]->response->getStatusCode());', $contents);
 
         $this->assertPhpFileIsLintable($path);
         $this->assertGeneratedPestTestIsStructurallyRunnable($path, [
@@ -128,6 +136,8 @@ final class ScenarioPestTestWriterTest extends TestCase
             'seed' => 'Database\\Seeders\\CheckoutScenarioSeeder',
             'captures' => ['cap_checkout_completed', 'cap_order_created'],
             'routes' => ['checkout.show', 'checkout.success'],
+            'routeStatuses' => [202, 200],
+            'routeBodies' => ['Checkout queued', 'ok'],
             'dispatches' => 2,
         ]);
     }
@@ -190,7 +200,7 @@ final class ScenarioPestTestWriterTest extends TestCase
     }
 
     /**
-     * @param array{description: string, scenario: string, mode: string, seed: string|null, captures: list<string>, routes: list<string>, dispatches: int|null} $expected
+     * @param array{description: string, scenario: string, mode: string, seed: string|null, captures: list<string>, routes: list<string>, routeStatuses?: list<int>, routeBodies?: list<string>, dispatches: int|null} $expected
      */
     private function assertGeneratedPestTestIsStructurallyRunnable(string $path, array $expected): void
     {
@@ -236,7 +246,7 @@ final class PreviewScenarioGeneratedPestHarness
 
     public static ?Closure $test = null;
 
-    /** @var array{description: string, scenario: string, mode: string, seed: string|null, captures: list<string>, routes: list<string>, dispatches: int|null}|null */
+    /** @var array{description: string, scenario: string, mode: string, seed: string|null, captures: list<string>, routes: list<string>, routeStatuses?: list<int>, routeBodies?: list<string>, dispatches: int|null}|null */
     public static ?array $expected = null;
 
     /** @var list<array{0: string, 1: string, 2: string|null}> */
@@ -272,7 +282,7 @@ function app(?string $abstract = null): object
                 $expected['captures'],
             );
             $routes = array_map(
-                static fn (string $route): ScenarioRouteResult => new ScenarioRouteResult(
+                static fn (string $route, int $index): ScenarioRouteResult => new ScenarioRouteResult(
                     new RoutePreview(
                         name: $route,
                         uri: '/'.$route,
@@ -284,9 +294,13 @@ function app(?string $abstract = null): object
                         url: 'http://localhost/'.$route,
                         expiresAt: new \DateTimeImmutable('+5 minutes'),
                     ),
-                    new Response('ok', 200),
+                    new Response(
+                        $expected['routeBodies'][$index] ?? 'ok',
+                        $expected['routeStatuses'][$index] ?? 200,
+                    ),
                 ),
                 $expected['routes'],
+                array_keys($expected['routes']),
             );
             $dispatches = array_fill(0, $expected['dispatches'] ?? 0, null);
 

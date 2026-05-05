@@ -12,12 +12,14 @@ use Oxhq\Preview\Commands\CaptureListCommand;
 use Oxhq\Preview\Commands\CaptureReplayCommand;
 use Oxhq\Preview\Commands\CaptureShowCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
+use Oxhq\Preview\Commands\ProviderListCommand;
 use Oxhq\Preview\Commands\RoutePreviewCommand;
 use Oxhq\Preview\Commands\ScenarioListCommand;
 use Oxhq\Preview\Commands\ScenarioMakeCommand;
 use Oxhq\Preview\Commands\ScenarioReplayCommand;
 use Oxhq\Preview\Commands\ScenarioShowCommand;
 use Oxhq\Preview\Commands\ScenarioTestCommand;
+use Oxhq\Preview\Commands\TransportListCommand;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\ReplayService;
@@ -188,12 +190,14 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureReplayCommand::class,
                 CaptureShowCommand::class,
                 CaptureTestCommand::class,
+                ProviderListCommand::class,
                 RoutePreviewCommand::class,
                 ScenarioListCommand::class,
                 ScenarioMakeCommand::class,
                 ScenarioReplayCommand::class,
                 ScenarioShowCommand::class,
                 ScenarioTestCommand::class,
+                TransportListCommand::class,
             ]);
         }
 

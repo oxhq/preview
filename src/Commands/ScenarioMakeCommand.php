@@ -19,6 +19,8 @@ final class ScenarioMakeCommand extends Command
         {--route-user=* : Route user context as "route:id:model"; may be repeated}
         {--route-readonly-db=* : Route name that should request readonly database preview; may be repeated}
         {--route-fake=* : Route fake as "route:fake"; may be repeated}
+        {--route-status=* : Route expected HTTP status as "route=200"; may be repeated}
+        {--route-output-contains=* : Route expected response text as "route=text"; may be repeated}
         {--fake=* : Laravel fake to apply, such as queue, mail, http, or events; may be repeated}
         {--seed= : Seeder class to run before replay}
         {--note= : Scenario note}
@@ -49,6 +51,10 @@ final class ScenarioMakeCommand extends Command
                     readonlyRoutes: (array) $this->option('route-readonly-db'),
                     routeFakes: (array) $this->option('route-fake'),
                 ),
+                routeExpectations: $this->routeExpectations(
+                    routeStatuses: (array) $this->option('route-status'),
+                    routeOutputs: (array) $this->option('route-output-contains'),
+                ),
                 captures: $this->stringList((array) $this->option('capture')),
                 fakes: $this->stringList((array) $this->option('fake')),
                 notes: $this->optionalString($this->option('note')),
@@ -76,6 +82,7 @@ final class ScenarioMakeCommand extends Command
      * @param list<string> $routes
      * @param array<string, array<string, string>> $routeParameters
      * @param array<string, array<string, mixed>> $routeContext
+     * @param array<string, array<string, mixed>> $routeExpectations
      * @param list<string> $captures
      * @param list<string> $fakes
      */
@@ -85,6 +92,7 @@ final class ScenarioMakeCommand extends Command
         array $routes,
         array $routeParameters,
         array $routeContext,
+        array $routeExpectations,
         array $captures,
         array $fakes,
         ?string $notes,
@@ -97,6 +105,7 @@ final class ScenarioMakeCommand extends Command
             .'    routes: '.$this->export($routes).",\n"
             .'    routeParameters: '.$this->export($routeParameters).",\n"
             .'    routeContext: '.$this->export($routeContext).",\n"
+            .'    routeExpectations: '.$this->export($routeExpectations).",\n"
             .'    captures: '.$this->export($captures).",\n"
             .'    fakes: '.$this->export($fakes).",\n"
             .'    notes: '.$this->export($notes).",\n"
@@ -212,6 +221,44 @@ final class ScenarioMakeCommand extends Command
     }
 
     /**
+     * @param list<string> $routeStatuses
+     * @param list<string> $routeOutputs
+     * @return array<string, array<string, mixed>>
+     */
+    private function routeExpectations(array $routeStatuses, array $routeOutputs): array
+    {
+        $expectations = [];
+
+        foreach ($routeStatuses as $value) {
+            if (! is_scalar($value)) {
+                continue;
+            }
+
+            [$route, $status] = $this->parseRouteStatus((string) $value);
+            $expectations[$route]['status'] = $status;
+        }
+
+        foreach ($routeOutputs as $value) {
+            if (! is_scalar($value)) {
+                continue;
+            }
+
+            [$route, $output] = $this->parseRouteAssignment((string) $value, 'output');
+            $expectations[$route]['output_contains'] = $output;
+        }
+
+        foreach ($expectations as $route => $expectation) {
+            if (! array_key_exists('status', $expectation)) {
+                throw new RuntimeException("Scenario route output expectation for [{$route}] requires --route-status={$route}=<status>.");
+            }
+        }
+
+        ksort($expectations);
+
+        return $expectations;
+    }
+
+    /**
      * @return array{0: string, 1: string, 2: string}
      */
     private function parseRouteParameter(string $value): array
@@ -255,6 +302,20 @@ final class ScenarioMakeCommand extends Command
         }
 
         return [$route, $assigned];
+    }
+
+    /**
+     * @return array{0: string, 1: int}
+     */
+    private function parseRouteStatus(string $value): array
+    {
+        [$route, $status] = $this->parseRouteAssignment($value, 'status');
+
+        if (preg_match('/^\d{3}$/', $status) !== 1 || (int) $status < 100 || (int) $status > 599) {
+            throw new RuntimeException("Scenario route status [{$value}] must use route=HTTP_STATUS with a status between 100 and 599.");
+        }
+
+        return [$route, (int) $status];
     }
 
     /**

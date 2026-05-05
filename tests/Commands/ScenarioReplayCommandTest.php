@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Tests\Commands;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Route;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\PreviewRequest;
@@ -12,7 +14,6 @@ use Oxhq\Preview\Capture\ReplayResult;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
 use Oxhq\Preview\Tests\TestCase;
-use Illuminate\Support\Facades\Route;
 
 final class ScenarioReplayCommandTest extends TestCase
 {
@@ -60,6 +61,60 @@ PHP, $capture->id));
         $this->assertSame(1, CommandRecordingScenarioSeeder::$runs);
     }
 
+    public function test_preview_scenario_replay_can_emit_exact_mode_json(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+        $capture = $this->storeGenericCapture('/webhooks/orders');
+
+        Route::get('/checkout/show', fn (): string => 'checkout')
+            ->name('checkout.show');
+
+        $this->writeScenario($path, 'checkout-json.php', sprintf(<<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+use Oxhq\Preview\Tests\Commands\CommandRecordingScenarioSeeder;
+
+return new Scenario(
+    name: 'checkout-json-flow',
+    seed: CommandRecordingScenarioSeeder::class,
+    routes: ['checkout.show'],
+    captures: ['%s'],
+);
+PHP, $capture->id));
+
+        [$exitCode, $output] = $this->runReplayJson([
+            'scenario' => 'checkout-json-flow',
+            '--exact' => true,
+            '--json' => true,
+        ]);
+
+        $payload = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame('checkout-json-flow', $payload['scenario']);
+        $this->assertSame('exact', $payload['mode']);
+        $this->assertSame(CommandRecordingScenarioSeeder::class, $payload['seed']);
+        $this->assertTrue($payload['successful']);
+        $this->assertNull($payload['failure']);
+        $this->assertSame([
+            'seed' => 1,
+            'captures' => 1,
+            'dispatches' => 0,
+            'routes' => 1,
+        ], $payload['summary']);
+        $this->assertSame($capture->id, $payload['captures'][0]['id']);
+        $this->assertSame('POST', $payload['captures'][0]['method']);
+        $this->assertSame('/webhooks/orders', $payload['captures'][0]['path']);
+        $this->assertNull($payload['captures'][0]['dispatch']);
+        $this->assertSame([], $payload['dispatches']);
+        $this->assertSame('checkout.show', $payload['routes'][0]['name']);
+        $this->assertSame(200, $payload['routes'][0]['status_code']);
+        $this->assertSame('checkout', $payload['routes'][0]['output']);
+        $this->assertTrue($payload['routes'][0]['successful']);
+    }
+
     public function test_preview_scenario_replay_replays_captures_in_resign_mode(): void
     {
         $path = $this->scenarioPath();
@@ -85,6 +140,60 @@ PHP, $capture->id));
             ->expectsOutput("Capture: {$capture->id} POST /webhooks/signed")
             ->expectsOutput('Summary: seed=0 captures=1 dispatches=0 routes=0')
             ->assertExitCode(0);
+    }
+
+    public function test_preview_scenario_replay_can_emit_resign_mode_json_with_dispatch_failure(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+        $capture = $this->storeHmacCapture('/webhooks/signed', '{"signed":true}');
+
+        $this->app->instance(HttpReplayDispatcher::class, new HttpReplayDispatcher(
+            fn (): ReplayResult => new ReplayResult(503, 'receiver unavailable', ['X-Replay' => ['failed']]),
+        ));
+
+        $this->writeScenario($path, 'signed-json.php', sprintf(<<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'signed-json-flow',
+    captures: ['%s'],
+);
+PHP, $capture->id));
+
+        [$exitCode, $output] = $this->runReplayJson([
+            'scenario' => 'signed-json-flow',
+            '--resign' => true,
+            '--send-to' => 'https://receiver.test',
+            '--json' => true,
+        ]);
+
+        $payload = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertSame('signed-json-flow', $payload['scenario']);
+        $this->assertSame('resign', $payload['mode']);
+        $this->assertNull($payload['seed']);
+        $this->assertFalse($payload['successful']);
+        $this->assertSame("Scenario replay failed: dispatch for capture [{$capture->id}] returned HTTP 503.", $payload['failure']);
+        $this->assertSame([
+            'seed' => 0,
+            'captures' => 1,
+            'dispatches' => 1,
+            'routes' => 0,
+        ], $payload['summary']);
+        $this->assertSame($capture->id, $payload['captures'][0]['id']);
+        $this->assertSame('resign', $payload['captures'][0]['mode']);
+        $this->assertSame(503, $payload['captures'][0]['dispatch']['status_code']);
+        $this->assertFalse($payload['captures'][0]['dispatch']['successful']);
+        $this->assertSame($capture->id, $payload['dispatches'][0]['capture_id']);
+        $this->assertSame(503, $payload['dispatches'][0]['status_code']);
+        $this->assertSame('receiver unavailable', $payload['dispatches'][0]['body']);
+        $this->assertSame(['X-Replay' => ['failed']], $payload['dispatches'][0]['headers']);
+        $this->assertFalse($payload['dispatches'][0]['successful']);
+        $this->assertSame([], $payload['routes']);
     }
 
     public function test_preview_scenario_replay_rejects_missing_scenarios_clearly(): void
@@ -267,6 +376,18 @@ PHP, $capture->id));
         file_put_contents($file, $contents);
 
         return $file;
+    }
+
+    /**
+     * @param array<string, mixed> $parameters
+     * @return array{0: int, 1: string}
+     */
+    private function runReplayJson(array $parameters): array
+    {
+        $output = new \Symfony\Component\Console\Output\BufferedOutput();
+        $exitCode = $this->app->make(Kernel::class)->call('preview:scenario:replay', $parameters, $output);
+
+        return [$exitCode, $output->fetch()];
     }
 }
 

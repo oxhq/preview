@@ -66,6 +66,79 @@ PHP);
         ));
     }
 
+    public function test_it_normalizes_route_expectations_by_route_name(): void
+    {
+        $path = $this->scenarioPath();
+        $this->writeScenario($path, 'route-expectations.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'checkout-flow',
+    routes: ['checkout.show', 'checkout.success'],
+    routeExpectations: [
+        ' checkout.show ' => [
+            'status' => ' 202 ',
+            'outputContains' => 'Queued',
+        ],
+        'checkout.success' => [
+            'status' => 200,
+            'output_contains' => 'Payment complete',
+        ],
+        '' => [
+            'status' => 204,
+        ],
+    ],
+);
+PHP);
+
+        $scenario = (new ScenarioRepository($path))->find('checkout-flow');
+
+        $this->assertInstanceOf(Scenario::class, $scenario);
+        $this->assertSame([
+            'checkout.show' => [
+                'status' => 202,
+                'output_contains' => 'Queued',
+            ],
+            'checkout.success' => [
+                'status' => 200,
+                'output_contains' => 'Payment complete',
+            ],
+        ], $scenario->routeExpectations);
+    }
+
+    public function test_it_keeps_older_positional_route_context_scenarios_compatible(): void
+    {
+        $path = $this->scenarioPath();
+        $this->writeScenario($path, 'positional-route-context.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    'positional-flow',
+    null,
+    ['checkout.show'],
+    [],
+    [],
+    [],
+    null,
+    ['checkout.show' => ['session' => ['tenant' => 'acme']]],
+);
+PHP);
+
+        $scenario = (new ScenarioRepository($path))->find('positional-flow');
+
+        $this->assertInstanceOf(Scenario::class, $scenario);
+        $this->assertSame([
+            'checkout.show' => [
+                'session' => ['tenant' => 'acme'],
+            ],
+        ], $scenario->routeContext);
+        $this->assertSame([], $scenario->routeExpectations);
+    }
+
     public function test_it_returns_an_empty_list_when_the_scenario_path_does_not_exist(): void
     {
         $this->assertSame([], (new ScenarioRepository($this->scenarioPath().'/missing'))->all());

@@ -10,7 +10,9 @@ use Throwable;
 
 final class CaptureShowCommand extends Command
 {
-    protected $signature = 'preview:capture:show {capture : Capture ID}';
+    protected $signature = 'preview:capture:show
+        {capture : Capture ID}
+        {--json : Emit machine-readable JSON output}';
 
     protected $description = 'Show redacted Preview capture metadata.';
 

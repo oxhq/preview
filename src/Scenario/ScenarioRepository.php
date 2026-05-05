@@ -89,6 +89,7 @@ final class ScenarioRepository
             captures: $this->normalizeList($scenario->captures),
             fakes: $this->normalizeFakes($scenario->fakes, $file),
             notes: $scenario->notes === null || trim($scenario->notes) === '' ? null : trim($scenario->notes),
+            routeExpectations: $this->normalizeRouteExpectations($scenario->routeExpectations, $file),
             routeContext: $this->normalizeRouteContext($scenario->routeContext, $file),
         );
     }
@@ -281,6 +282,111 @@ final class ScenarioRepository
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * @param array<string, mixed> $routeExpectations
+     * @return array<string, array{status: int, output_contains?: string}>
+     */
+    private function normalizeRouteExpectations(array $routeExpectations, string $file): array
+    {
+        $normalized = [];
+
+        foreach ($routeExpectations as $routeName => $expectation) {
+            if (! is_scalar($routeName)) {
+                continue;
+            }
+
+            $routeName = trim((string) $routeName);
+
+            if ($routeName === '') {
+                continue;
+            }
+
+            if (! is_array($expectation)) {
+                throw new RuntimeException(sprintf(
+                    'Scenario file [%s] route [%s] expectation must be an array.',
+                    $file,
+                    $routeName,
+                ));
+            }
+
+            $normalized[$routeName] = $this->normalizeSingleRouteExpectation($expectation, $file, $routeName);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $expectation
+     * @return array{status: int, output_contains?: string}
+     */
+    private function normalizeSingleRouteExpectation(array $expectation, string $file, string $routeName): array
+    {
+        $normalized = [];
+
+        foreach ($expectation as $key => $value) {
+            if (! is_string($key)) {
+                continue;
+            }
+
+            $key = match ($key) {
+                'outputContains' => 'output_contains',
+                default => $key,
+            };
+
+            if ($key === 'status') {
+                $status = $this->normalizeHttpStatus($value);
+
+                if ($status === null) {
+                    $this->invalidRouteExpectation($file, $routeName, $key, 'an HTTP status code');
+                }
+
+                $normalized['status'] = $status;
+
+                continue;
+            }
+
+            if ($key === 'output_contains') {
+                $outputContains = $this->normalizeOptionalString($value);
+
+                if ($outputContains !== null) {
+                    $normalized['output_contains'] = $outputContains;
+                }
+
+                continue;
+            }
+
+            $this->invalidRouteExpectation($file, $routeName, $key, 'a supported key');
+        }
+
+        if (! array_key_exists('status', $normalized)) {
+            $this->invalidRouteExpectation($file, $routeName, 'status', 'an HTTP status code');
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeHttpStatus(mixed $value): ?int
+    {
+        if (! is_int($value) && ! (is_string($value) && preg_match('/^\s*\d{3}\s*$/', $value) === 1)) {
+            return null;
+        }
+
+        $status = (int) $value;
+
+        return $status >= 100 && $status <= 599 ? $status : null;
+    }
+
+    private function invalidRouteExpectation(string $file, string $routeName, string $key, string $expected): never
+    {
+        throw new RuntimeException(sprintf(
+            'Scenario file [%s] route [%s] expectation key [%s] must be %s.',
+            $file,
+            $routeName,
+            $key,
+            $expected,
+        ));
     }
 
     private function invalidRouteContext(string $file, string $routeName, string $key, string $expected): never

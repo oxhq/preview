@@ -80,10 +80,10 @@ final class ScenarioPestTestWriter
         $php .= "    \$this->assertCount(".count($scenario->routes).", \$result->routes);\n";
 
         foreach ($scenario->routes as $index => $route) {
+            $expectation = $this->routeExpectation($scenario, $route);
+
             $php .= "    \$this->assertSame(".$this->exportString($route).", \$result->routes[{$index}]->preview->name);\n"
-                ."    \$this->assertTrue(\$result->routes[{$index}]->successful());\n"
-                ."    \$this->assertGreaterThanOrEqual(200, \$result->routes[{$index}]->response->getStatusCode());\n"
-                ."    \$this->assertLessThan(300, \$result->routes[{$index}]->response->getStatusCode());\n";
+                .$this->routeResponseAssertions($expectation, $index);
         }
 
         $php .= "});\n";
@@ -181,6 +181,38 @@ final class ScenarioPestTestWriter
         $context = $scenario->routeContext[$route] ?? [];
 
         return is_array($context) ? $context : [];
+    }
+
+    /**
+     * @return array{status?: int, output_contains?: string}
+     */
+    private function routeExpectation(Scenario $scenario, string $route): array
+    {
+        $expectation = $scenario->routeExpectations[$route] ?? [];
+
+        return is_array($expectation) ? $expectation : [];
+    }
+
+    /**
+     * @param array{status?: int, output_contains?: string} $expectation
+     */
+    private function routeResponseAssertions(array $expectation, int $index): string
+    {
+        if (array_key_exists('status', $expectation)) {
+            $php = "    \$this->assertSame(".((int) $expectation['status']).", \$result->routes[{$index}]->response->getStatusCode());\n";
+
+            if (array_key_exists('output_contains', $expectation)) {
+                $php .= "    \$this->assertStringContainsString("
+                    .$this->exportString((string) $expectation['output_contains'])
+                    .", (string) \$result->routes[{$index}]->response->getContent());\n";
+            }
+
+            return $php;
+        }
+
+        return "    \$this->assertTrue(\$result->routes[{$index}]->successful());\n"
+            ."    \$this->assertGreaterThanOrEqual(200, \$result->routes[{$index}]->response->getStatusCode());\n"
+            ."    \$this->assertLessThan(300, \$result->routes[{$index}]->response->getStatusCode());\n";
     }
 
     /**

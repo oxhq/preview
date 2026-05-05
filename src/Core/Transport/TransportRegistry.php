@@ -26,4 +26,10 @@ class TransportRegistry
 
         return $this->transports[$key];
     }
+
+    /** @return array<string, TunnelTransport> */
+    public function all(): array
+    {
+        return $this->transports;
+    }
 }

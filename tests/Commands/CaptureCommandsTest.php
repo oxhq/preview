@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Oxhq\Preview\Tests\Commands;
 
+use Illuminate\Support\Facades\Artisan;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\ReplayResult;
@@ -252,6 +253,89 @@ final class CaptureCommandsTest extends TestCase
         $this->artisan('preview:capture:test', ['capture' => $record->id])
             ->expectsOutputToContain('Pest test generated')
             ->assertExitCode(0);
+    }
+
+    public function test_capture_list_json_outputs_redacted_capture_summaries(): void
+    {
+        $this->artisan('preview:capture', [
+            'provider' => 'generic',
+            '--path' => '/webhooks/orders',
+            '--body' => '{"id":1}',
+            '--header' => ['X-Preview-Event: order.created', 'Authorization: Bearer list-secret'],
+        ])->assertExitCode(0);
+
+        $exitCode = Artisan::call('preview:capture:list', [
+            '--json' => true,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+
+        $summaries = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertIsArray($summaries);
+        $this->assertCount(1, $summaries);
+        $this->assertSame('generic', $summaries[0]['provider']);
+        $this->assertSame('order.created', $summaries[0]['event_type']);
+        $this->assertSame('POST', $summaries[0]['method']);
+        $this->assertSame('/webhooks/orders', $summaries[0]['path']);
+        $this->assertSame('[redacted]', $summaries[0]['headers']['Authorization']);
+        $this->assertArrayNotHasKey('raw_body', $summaries[0]);
+        $this->assertArrayNotHasKey('raw_body_path', $summaries[0]);
+        $this->assertStringNotContainsString('list-secret', Artisan::output());
+    }
+
+    public function test_capture_show_accepts_explicit_json_option(): void
+    {
+        $this->artisan('preview:capture', [
+            'provider' => 'generic',
+            '--path' => '/webhooks/orders',
+            '--body' => '{"id":1}',
+        ])->assertExitCode(0);
+
+        $record = app(CaptureRepository::class)->all()[0];
+        $exitCode = Artisan::call('preview:capture:show', [
+            'capture' => $record->id,
+            '--json' => true,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+
+        $capture = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame($record->id, $capture['id']);
+        $this->assertSame('generic', $capture['provider']);
+    }
+
+    public function test_capture_replay_json_outputs_safe_payload_metadata_without_raw_body(): void
+    {
+        $this->artisan('preview:capture', [
+            'provider' => 'generic',
+            '--path' => '/webhooks/orders',
+            '--body' => '{"id":1}',
+            '--header' => ['X-Preview-Event: order.created', 'Authorization: Bearer replay-secret'],
+        ])->assertExitCode(0);
+
+        $record = app(CaptureRepository::class)->all()[0];
+        $exitCode = Artisan::call('preview:capture:replay', [
+            'capture' => $record->id,
+            '--exact' => true,
+            '--json' => true,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame($record->id, $payload['id']);
+        $this->assertSame('exact', $payload['mode']);
+        $this->assertSame('generic', $payload['provider']);
+        $this->assertSame('POST', $payload['method']);
+        $this->assertSame('/webhooks/orders', $payload['path']);
+        $this->assertSame('[redacted]', $payload['headers']['Authorization']);
+        $this->assertSame(8, $payload['raw_body_bytes']);
+        $this->assertArrayNotHasKey('raw_body', $payload);
+        $this->assertStringNotContainsString('replay-secret', Artisan::output());
+        $this->assertStringNotContainsString('{"id":1}', Artisan::output());
     }
 
     public function test_capture_replay_can_dispatch_to_http_target_with_injected_transport(): void
