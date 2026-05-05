@@ -54,14 +54,8 @@ final class ScenarioReplayCommand extends Command
             $this->line("Seed: {$result->seed}");
         }
 
-        if ($result->scenario->routes !== []) {
-            $this->line('Routes: '.implode(', ', $result->scenario->routes).' (metadata only; route composition is not implemented in this command)');
-        }
-
         if ($result->captures === []) {
             $this->line('Captures: none');
-
-            return self::SUCCESS;
         }
 
         foreach ($result->captures as $index => $payload) {
@@ -81,6 +75,26 @@ final class ScenarioReplayCommand extends Command
                 if (! $dispatch->successful()) {
                     return self::FAILURE;
                 }
+            }
+        }
+
+        if ($result->routes === []) {
+            $this->line('Routes: none');
+
+            return self::SUCCESS;
+        }
+
+        foreach ($result->routes as $route) {
+            $statusCode = $route->response->getStatusCode();
+            $this->line("Route: {$route->preview->name} HTTP {$statusCode}");
+            $content = trim((string) $route->response->getContent());
+
+            if ($content !== '') {
+                $this->line("Route output: {$content}");
+            }
+
+            if (! $route->successful()) {
+                return self::FAILURE;
             }
         }
 

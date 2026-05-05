@@ -40,7 +40,13 @@ final class ScenarioListCommand extends Command
         $this->line('Preview scenarios:');
 
         foreach ($scenarios as $scenario) {
-            $this->line(' - '.$scenario->name);
+            $this->line(sprintf(
+                ' - %s (captures: %d, routes: %d, fakes: %d)',
+                $scenario->name,
+                count($scenario->captures),
+                count($scenario->routes),
+                count($scenario->fakes),
+            ));
         }
 
         return self::SUCCESS;

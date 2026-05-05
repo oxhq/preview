@@ -81,6 +81,71 @@ final class ScenarioRepository
             throw new RuntimeException(sprintf('Scenario file [%s] must define a non-empty scenario name.', $file));
         }
 
-        return $scenario;
+        return new Scenario(
+            name: trim($scenario->name),
+            seed: $scenario->seed === null || trim($scenario->seed) === '' ? null : trim($scenario->seed),
+            routes: $this->normalizeList($scenario->routes),
+            routeParameters: $scenario->routeParameters,
+            captures: $this->normalizeList($scenario->captures),
+            fakes: $this->normalizeFakes($scenario->fakes, $file),
+            notes: $scenario->notes === null || trim($scenario->notes) === '' ? null : trim($scenario->notes),
+        );
+    }
+
+    /**
+     * @param list<string|mixed> $values
+     * @return list<string>
+     */
+    private function normalizeList(array $values): array
+    {
+        $normalized = [];
+
+        foreach ($values as $value) {
+            if (! is_scalar($value)) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+
+            if ($value !== '') {
+                $normalized[] = $value;
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * @param list<string|mixed> $fakes
+     * @return list<string>
+     */
+    private function normalizeFakes(array $fakes, string $file): array
+    {
+        $allowed = ['queue', 'mail', 'http', 'events'];
+        $normalized = [];
+
+        foreach ($fakes as $fake) {
+            if (! is_scalar($fake)) {
+                continue;
+            }
+
+            $fake = strtolower(trim((string) $fake));
+
+            if ($fake === '') {
+                continue;
+            }
+
+            if (! in_array($fake, $allowed, true)) {
+                throw new RuntimeException(sprintf(
+                    'Scenario file [%s] defines unsupported fake [%s]. Supported fakes: queue, mail, http, events.',
+                    $file,
+                    $fake,
+                ));
+            }
+
+            $normalized[] = $fake;
+        }
+
+        return array_values(array_unique($normalized));
     }
 }

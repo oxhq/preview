@@ -16,6 +16,7 @@ use Oxhq\Preview\Commands\RoutePreviewCommand;
 use Oxhq\Preview\Commands\ScenarioListCommand;
 use Oxhq\Preview\Commands\ScenarioReplayCommand;
 use Oxhq\Preview\Commands\ScenarioShowCommand;
+use Oxhq\Preview\Commands\ScenarioTestCommand;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\ReplayService;
@@ -40,6 +41,7 @@ use Oxhq\Preview\Scenario\ScenarioRepository;
 use Oxhq\Preview\Scenario\ScenarioRunner;
 use Oxhq\Preview\Testing\FixtureWriter;
 use Oxhq\Preview\Testing\PestTestWriter;
+use Oxhq\Preview\Testing\ScenarioPestTestWriter;
 
 class PreviewServiceProvider extends ServiceProvider
 {
@@ -157,6 +159,10 @@ class PreviewServiceProvider extends ServiceProvider
                 $this->app->make(FixtureWriter::class),
             );
         });
+
+        $this->app->singleton(ScenarioPestTestWriter::class, function (): ScenarioPestTestWriter {
+            return new ScenarioPestTestWriter(config('preview.test_path'));
+        });
     }
 
     public function boot(): void
@@ -177,6 +183,7 @@ class PreviewServiceProvider extends ServiceProvider
                 ScenarioListCommand::class,
                 ScenarioReplayCommand::class,
                 ScenarioShowCommand::class,
+                ScenarioTestCommand::class,
             ]);
         }
 

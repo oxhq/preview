@@ -40,9 +40,9 @@ final class ScenarioShowCommand extends Command
 
         $this->line("Scenario: {$scenario->name}");
         $this->line('Seed: '.($scenario->seed ?? 'none'));
-        $this->line('Routes: '.$this->formatList($scenario->routes));
-        $this->line('Captures: '.$this->formatList($scenario->captures));
-        $this->line('Fakes: '.$this->formatList($scenario->fakes));
+        $this->line(sprintf('Routes (%d): %s', count($scenario->routes), $this->formatList($scenario->routes)));
+        $this->line(sprintf('Captures (%d): %s', count($scenario->captures), $this->formatList($scenario->captures)));
+        $this->line(sprintf('Fakes (%d): %s', count($scenario->fakes), $this->formatList($scenario->fakes)));
 
         if ($scenario->notes !== null && trim($scenario->notes) !== '') {
             $this->line('Notes: '.$scenario->notes);

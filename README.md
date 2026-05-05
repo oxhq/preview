@@ -111,7 +111,7 @@ Route preview creates signed, time-limited links for named Laravel routes and pr
 
 Repeated `--session=key=value` flags carry session context into the proxied preview request. `--user-id` plus optional `--user-model` can attach an app-specific authenticated user context for the proxied request. `--guard` selects the guard for that explicit user context and remains audit metadata; by itself it does not authenticate a user, isolate the filesystem, or isolate cache.
 
-Route preview now behavior-tests the supported queue, mail, HTTP, and event fakes. The auth context is not a generic authorization bypass, policy bypass, or full scenario-isolation feature.
+Route preview now behavior-tests the supported queue, mail, HTTP, and event fakes. The auth context is not a generic authorization bypass, policy bypass, or complete isolation boundary.
 
 ## Scenario Workbench
 
@@ -125,13 +125,16 @@ return new Scenario(
     name: 'subscription-renewal',
     seed: DemoSubscriptionSeeder::class,
     routes: ['billing.portal'],
+    routeParameters: [
+        'billing.portal' => ['id' => '123'],
+    ],
     captures: ['20260505011852323-sugxujb2'],
     fakes: ['queue', 'mail'],
     notes: 'Exercises the local renewal review flow after a captured provider callback.',
 );
 ```
 
-Scenario files record capture IDs, route names for future route-preview composition, fake boundaries, an optional seed class, and optional notes. The foundation commands are intentionally read-only:
+Scenario files record capture IDs, route names, optional route parameters, fake boundaries, an optional seed class, and optional notes. The discovery commands are intentionally read-only:
 
 ```bash
 php artisan preview:scenario:list
@@ -147,11 +150,13 @@ php artisan preview:scenario:replay subscription-renewal --resign
 
 `--exact` replays each scenario capture with the stored raw body and captured headers. `--resign` replays each scenario capture with the stored raw body plus fresh provider-valid signature headers when the provider supports signing. Scenario replay fails clearly when a capture cannot be found, a provider cannot re-sign, or a configured seeder fails.
 
-Route composition and scenario test generation are not complete unless the route execution and Pest-compatible scenario generation commands are implemented, behavior-tested, and covered by fresh consumer evidence. Captures, route preview, fixtures, and generated capture-level Pest tests remain the proven executable surfaces today.
+Scenario route composition is package-local behavior only when named route previews execute through `preview:scenario:replay` under the same route-preview safety limits. Scenario fakes such as `queue`, `mail`, `http`, and `events` are fake requests to the route-preview layer; they do not create complete side-effect isolation for cache, filesystem, external services outside Laravel's fake boundary, authorization policy bypass, or hosted sharing.
+
+Scenario Pest test generation now writes Pest-compatible scenario test files from local scenario files. Package tests prove the generated file content and command behavior; they do not prove a fresh consumer app running those Pest files. Captures, route preview, fixtures, generated capture-level Pest tests, and the package-internal Scenario replay slices are the proven local surfaces today.
 
 ## Current Proof Boundary
 
-This repository has package-internal Testbench coverage for capture, replay, fixture generation, provider contracts, and route preview. It also has a recorded Laravel 12 path-repository consumer smoke. That is still not proof of Packagist publication, hosted CI, or live tunnel startup with real cloudflared/ngrok binaries.
+This repository has package-internal Testbench coverage for capture, replay, fixture generation, provider contracts, route preview, and the implemented Scenario slices. It also has a recorded Laravel 12 path-repository consumer smoke for package discovery and synthetic capture. Package tests may prove local package behavior; they do not prove Packagist publication, hosted CI, SaaS behavior, live tunnel startup with real cloudflared/ngrok binaries, or a fresh consumer app running every Scenario workflow.
 
 Run local verification:
 

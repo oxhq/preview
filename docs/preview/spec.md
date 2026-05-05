@@ -444,6 +444,9 @@ return new Scenario(
     name: 'subscription-renewal',
     seed: DemoSubscriptionSeeder::class,
     routes: ['billing.portal'],
+    routeParameters: [
+        'billing.portal' => ['id' => '123'],
+    ],
     captures: ['20260505011852323-sugxujb2'],
     fakes: ['queue', 'mail'],
     notes: 'Exercises the local renewal review flow after a captured provider callback.',
@@ -454,19 +457,20 @@ Scenario files are regular PHP files stored under `preview/scenarios` by default
 
 - `name`: stable local scenario name used by list/show commands
 - `captures`: capture IDs from local capture storage
-- `routes`: Laravel route names for future route-preview composition
-- `fakes`: supported fake boundaries such as queue, mail, HTTP, and events
+- `routes`: Laravel route names for route-preview composition once replay executes route previews
+- `routeParameters`: optional per-route parameter map keyed by route name
+- `fakes`: supported fake boundaries such as queue, mail, HTTP, and events, forwarded only to route-preview execution
 - `seed`: optional Laravel seeder class name
 - `notes`: optional human context for the flow
 
-The foundation slice started as local catalog and inspection. Current package proof adds seed execution and capture replay composition, while route-preview composition and scenario test generation remain later v1.0 work.
+The foundation slice started as local catalog and inspection. Current package proof adds seed execution and capture replay composition. Route-preview composition is a separate replay slice: it is complete only when `preview:scenario:replay` executes named route previews, passes scenario fakes to the route-preview layer, reports route responses, and has package tests for the behavior. Scenario test generation remains a separate v1.0 slice.
 
 Executable Scenario slices are sequenced narrowly:
 
 1. Seed composition runs the configured seeder through Laravel's normal seeder path before any replay work. Seeder failures stop the scenario and report the failing seeder class.
 2. Capture replay composition adds `preview:scenario:replay {scenario}` and reuses existing capture replay behavior for each listed capture.
-3. Route composition executes named route previews only after the route-preview safety flags and boundaries are applied to scenario replay.
-4. Scenario test generation emits Pest-compatible tests only after seed, capture replay, and route composition are behavior-tested together.
+3. Route composition executes named route previews from scenario replay, using per-route parameters and forwarding scenario fakes to the existing route-preview safety layer.
+4. Scenario Pest generation emits Pest-compatible scenario test files after seed, capture replay, route composition, and fake propagation have package tests.
 
 Scenario replay must preserve the existing capture replay semantics:
 
@@ -477,7 +481,17 @@ php artisan preview:scenario:replay subscription-renewal --resign
 
 `--exact` replays each listed capture with its stored raw body and captured headers. `--resign` replays each listed capture with its stored raw body and fresh provider-valid signature headers when the provider supports signing. If a provider cannot re-sign, the command must fail clearly instead of silently falling back to exact replay.
 
-Route composition and scenario test generation are not complete unless the commands, package tests, and consumer evidence prove them. Documentation should continue to call route names future composition metadata until those later slices ship.
+Route composition can be claimed only at package-local level after commands and package tests prove named route execution through scenario replay. It is not consumer, CI, hosted, SaaS, or live-sharing proof. Scenario Pest generation can be claimed as package-local file generation; package tests do not by themselves prove Pest runs in a fresh consumer app.
+
+## Scenario Acceptance Boundaries
+
+Five parallel Scenario lanes stay separate:
+
+1. Route composition through scenario replay: local package proof may show named routes executing through the existing route-preview service. It must not be described as hosted sharing, CI replay, or consumer proof without fresh evidence at those levels.
+2. Scenario fake propagation to route previews: local package proof may show scenario `fakes` reaching the route-preview request. The fakes are still limited to supported Laravel facades and do not isolate cache, filesystem writes, authorization policies, or arbitrary external services.
+3. Scenario Pest test generation: package-local proof covers command output and generated file contents; fresh consumer Pest runtime remains unproven.
+4. Acceptance evidence: package tests prove local package behavior; the existing Laravel 12 path-repository smoke proves package discovery and synthetic capture in that consumer snapshot only.
+5. SaaS and CI boundaries: cloud replay, managed relay, persistent URLs, team scenario sharing, and hosted CI replay remain unproven product directions until real user demand and hosted proof exist.
 
 ## Open-Core Path
 

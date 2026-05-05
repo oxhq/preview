@@ -156,6 +156,9 @@ return new Scenario(
     name: 'subscription-renewal',
     seed: DemoSubscriptionSeeder::class,
     routes: ['billing.portal'],
+    routeParameters: [
+        'billing.portal' => ['id' => '123'],
+    ],
     captures: ['20260505011852323-sugxujb2'],
     fakes: ['queue', 'mail'],
     notes: 'Exercises the local renewal review flow after a captured provider callback.',
@@ -168,8 +171,9 @@ Foundation slice:
 - local PHP scenario files under `preview/scenarios` or configured `preview.scenario_path`
 - scenario repository that loads files returning `Oxhq\Preview\Scenario\Scenario`
 - capture ID composition
-- named route metadata for future route-preview composition
-- queue/mail/event/http fake configuration metadata
+- named route metadata for route-preview composition
+- per-route parameter metadata keyed by route name
+- queue/mail/event/http fake configuration metadata that may be forwarded to route-preview execution
 - optional seed class metadata
 - optional notes
 - `preview:scenario:list`
@@ -180,7 +184,7 @@ Executable v1.0 slices:
 - seeded state execution hooks (shipped in the current package proof)
 - capture replay composition through `preview:scenario:replay {scenario}` (shipped in the current package proof)
 - route preview execution composition
-- scenario replay command
+- scenario fake propagation to route previews
 - scenario test generation
 
 Seed composition executes the configured seeder through Laravel's normal seeder path before replay and fails clearly when the seeder cannot run. Capture replay composition reuses the existing capture replay engine from `preview:scenario:replay {scenario}`:
@@ -192,7 +196,12 @@ php artisan preview:scenario:replay subscription-renewal --resign
 
 `--exact` replays the stored raw body and captured headers for each scenario capture. `--resign` replays the stored raw body with fresh provider-valid signature headers when the provider supports signing, and fails clearly when a listed capture's provider cannot re-sign.
 
-Do not claim route composition or scenario test generation until those later slices are implemented and verified. Route composition is incomplete unless named route previews execute under the same safety flags and boundaries documented for route preview. Scenario test generation is incomplete unless Pest-compatible scenario files are generated and behavior-tested.
+Do not claim more than the evidence level proves:
+
+- Route composition is local package behavior only when named route previews execute under the same safety flags and boundaries documented for route preview.
+- Scenario fake propagation is local package behavior only when scenario `fakes` reach the route-preview layer; it does not prove full side-effect isolation.
+- Scenario test generation is local package behavior for generated Pest-compatible scenario files. It does not prove those generated files run in a fresh consumer app.
+- Package tests may prove local behavior. They do not prove a fresh consumer app, hosted CI, SaaS replay, live tunnel startup, Packagist installation, or team sharing.
 
 Advance only if users ask to save and replay complete flows, not just individual captures.
 
@@ -208,6 +217,14 @@ Potential SaaS:
 - CI replay
 - audit logs
 - managed relay
+
+Remaining SaaS/CI boundaries:
+
+- Hosted CI replay needs a real workflow run against a target branch or PR.
+- Cloud replay and managed relay need a real hosted endpoint exercised through an external URL.
+- Team-shared scenarios need multi-user storage, access control, audit behavior, and retention rules.
+- Persistent URLs need operational proof for expiry, revocation, abuse limits, and secret handling.
+- None of those are proven by package-local Scenario tests.
 
 SaaS trigger signals:
 

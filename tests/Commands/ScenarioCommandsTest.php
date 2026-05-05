@@ -31,8 +31,8 @@ PHP);
 
         $this->artisan('preview:scenario:list')
             ->expectsOutput('Preview scenarios:')
-            ->expectsOutput(' - checkout-flow')
-            ->expectsOutput(' - refund-flow')
+            ->expectsOutput(' - checkout-flow (captures: 0, routes: 0, fakes: 0)')
+            ->expectsOutput(' - refund-flow (captures: 0, routes: 0, fakes: 0)')
             ->assertExitCode(0);
     }
 
@@ -89,9 +89,9 @@ PHP);
         $this->artisan('preview:scenario:show', ['scenario' => 'checkout-flow'])
             ->expectsOutput('Scenario: checkout-flow')
             ->expectsOutput('Seed: Database\\Seeders\\CheckoutScenarioSeeder')
-            ->expectsOutput('Routes: checkout.show')
-            ->expectsOutput('Captures: stripe.checkout.completed')
-            ->expectsOutput('Fakes: mail')
+            ->expectsOutput('Routes (1): checkout.show')
+            ->expectsOutput('Captures (1): stripe.checkout.completed')
+            ->expectsOutput('Fakes (1): mail')
             ->expectsOutput('Notes: Happy-path checkout')
             ->assertExitCode(0);
     }

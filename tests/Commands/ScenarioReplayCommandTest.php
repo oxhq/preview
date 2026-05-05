@@ -12,6 +12,7 @@ use Oxhq\Preview\Capture\ReplayResult;
 use Oxhq\Preview\Providers\GenericHmacProvider;
 use Oxhq\Preview\Providers\GenericProvider;
 use Oxhq\Preview\Tests\TestCase;
+use Illuminate\Support\Facades\Route;
 
 final class ScenarioReplayCommandTest extends TestCase
 {
@@ -22,11 +23,14 @@ final class ScenarioReplayCommandTest extends TestCase
         CommandRecordingScenarioSeeder::$runs = 0;
     }
 
-    public function test_preview_scenario_replay_runs_seed_replays_exact_captures_and_marks_routes_as_metadata_only(): void
+    public function test_preview_scenario_replay_runs_seed_replays_exact_captures_and_routes(): void
     {
         $path = $this->scenarioPath();
         $this->app['config']->set('preview.scenario_path', $path);
         $capture = $this->storeGenericCapture('/webhooks/orders');
+
+        Route::get('/checkout/show', fn (): string => 'checkout')
+            ->name('checkout.show');
 
         $this->writeScenario($path, 'checkout.php', sprintf(<<<'PHP'
 <?php
@@ -48,8 +52,8 @@ PHP, $capture->id));
         ])
             ->expectsOutput('Scenario replay ready for [checkout-flow] using [exact].')
             ->expectsOutput('Seed: '.CommandRecordingScenarioSeeder::class)
-            ->expectsOutput('Routes: checkout.show (metadata only; route composition is not implemented in this command)')
             ->expectsOutput("Capture: {$capture->id} POST /webhooks/orders")
+            ->expectsOutput('Route: checkout.show HTTP 200')
             ->assertExitCode(0);
 
         $this->assertSame(1, CommandRecordingScenarioSeeder::$runs);

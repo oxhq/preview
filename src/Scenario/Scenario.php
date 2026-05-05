@@ -8,6 +8,7 @@ final class Scenario
 {
     /**
      * @param list<string> $routes
+     * @param array<string, array<string, string>> $routeParameters
      * @param list<string> $captures
      * @param list<string> $fakes
      */
@@ -15,6 +16,7 @@ final class Scenario
         public readonly string $name,
         public readonly ?string $seed = null,
         public readonly array $routes = [],
+        public readonly array $routeParameters = [],
         public readonly array $captures = [],
         public readonly array $fakes = [],
         public readonly ?string $notes = null,
