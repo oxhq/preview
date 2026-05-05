@@ -58,6 +58,77 @@ PHP);
         (new ScenarioRepository($path))->all();
     }
 
+    public function test_it_normalizes_route_context_for_preview_execution(): void
+    {
+        $path = $this->scenarioPath();
+        $this->writeScenario($path, 'route-context.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+use Oxhq\Preview\Tests\Scenario\ScenarioValidationUser;
+
+return new Scenario(
+    name: 'route-context-flow',
+    routes: [' billing.portal ', 'billing.portal'],
+    routeContext: [
+        ' billing.portal ' => [
+            'session' => [
+                ' tenant ' => ' acme ',
+                'ignored' => ['nested'],
+            ],
+            'guard' => ' web ',
+            'user_id' => 42,
+            'user_model' => ScenarioValidationUser::class,
+            'readonly_db' => true,
+            'fakes' => [' Mail ', 'mail', 'queue'],
+        ],
+    ],
+);
+PHP);
+
+        $scenario = (new ScenarioRepository($path))->find('route-context-flow');
+
+        $this->assertInstanceOf(Scenario::class, $scenario);
+        $this->assertSame([
+            'billing.portal' => [
+                'session' => ['tenant' => ' acme '],
+                'guard' => 'web',
+                'user_id' => '42',
+                'user_model' => ScenarioValidationUser::class,
+                'readonly_db' => true,
+                'fakes' => ['mail', 'queue'],
+            ],
+        ], $scenario->routeContext);
+    }
+
+    public function test_it_rejects_unsupported_route_context_fakes_clearly(): void
+    {
+        $path = $this->scenarioPath();
+        $file = $this->writeScenario($path, 'unsupported-route-fake.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'unsupported-route-fake-flow',
+    routes: ['billing.portal'],
+    routeContext: [
+        'billing.portal' => [
+            'fakes' => ['mail', 'cache'],
+        ],
+    ],
+);
+PHP);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf(
+            'Scenario file [%s] route [billing.portal] defines unsupported fake [cache]. Supported fakes: queue, mail, http, events.',
+            $file,
+        ));
+
+        (new ScenarioRepository($path))->all();
+    }
+
     private function scenarioPath(): string
     {
         return sys_get_temp_dir().'/preview-tests/scenarios/'.spl_object_id($this);
@@ -74,4 +145,8 @@ PHP);
 
         return $file;
     }
+}
+
+final class ScenarioValidationUser
+{
 }

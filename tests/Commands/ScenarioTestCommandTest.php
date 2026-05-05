@@ -34,6 +34,7 @@ PHP);
 
         $generated = $testPath.'/Preview/Scenario/checkout-flowTest.php';
         $this->assertFileExists($generated);
+        $this->assertPhpFileIsLintable($generated);
 
         $contents = (string) file_get_contents($generated);
 
@@ -43,16 +44,19 @@ PHP);
             'Precondition: run seed [Database\\Seeders\\CheckoutScenarioSeeder] before replaying this scenario.',
             $contents,
         );
+        $this->assertStringContainsString("->expectsOutputToContain('Seed: Database\\\\Seeders\\\\CheckoutScenarioSeeder')", $contents);
         $this->assertStringContainsString("->expectsOutputToContain('Capture: cap_checkout_completed')", $contents);
         $this->assertStringContainsString("->expectsOutputToContain('Capture: cap_order_created')", $contents);
         $this->assertStringContainsString(
-            'TODO route scenario execution: checkout.show (metadata only until route scenario test execution is implemented)',
+            'Route replay expected: checkout.show',
             $contents,
         );
         $this->assertStringContainsString(
-            'TODO route scenario execution: checkout.success (metadata only until route scenario test execution is implemented)',
+            'Route replay expected: checkout.success',
             $contents,
         );
+        $this->assertStringContainsString("->expectsOutputToContain('Route: checkout.show HTTP ')", $contents);
+        $this->assertStringContainsString("->expectsOutputToContain('Route: checkout.success HTTP ')", $contents);
     }
 
     public function test_preview_scenario_test_rejects_missing_scenarios_clearly(): void
@@ -88,5 +92,15 @@ PHP);
         file_put_contents($file, $contents);
 
         return $file;
+    }
+
+    private function assertPhpFileIsLintable(string $path): void
+    {
+        $output = [];
+        $exitCode = 1;
+
+        exec(PHP_BINARY.' -l '.escapeshellarg($path), $output, $exitCode);
+
+        $this->assertSame(0, $exitCode, implode(PHP_EOL, $output));
     }
 }

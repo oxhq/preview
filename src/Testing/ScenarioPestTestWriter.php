@@ -26,10 +26,10 @@ final class ScenarioPestTestWriter
     private function testPhp(Scenario $scenario): string
     {
         $php = "<?php\n\n"
-            ."it('replays {$scenario->name} preview scenario', function () {\n";
+            .'it('.$this->exportString("replays {$scenario->name} preview scenario").", function () {\n";
 
         if ($scenario->seed !== null) {
-            $php .= "    // Precondition: run seed [{$scenario->seed}] before replaying this scenario.\n";
+            $php .= '    // '.$this->commentLine("Precondition: run seed [{$scenario->seed}] before replaying this scenario.")."\n";
         } else {
             $php .= "    // Precondition: no scenario seed configured.\n";
         }
@@ -39,7 +39,7 @@ final class ScenarioPestTestWriter
         }
 
         foreach ($scenario->captures as $capture) {
-            $php .= "    // Capture fixture must exist locally: {$capture}\n";
+            $php .= '    // '.$this->commentLine("Capture fixture must exist locally: {$capture}")."\n";
         }
 
         if ($scenario->routes === []) {
@@ -47,7 +47,7 @@ final class ScenarioPestTestWriter
         }
 
         foreach ($scenario->routes as $route) {
-            $php .= "    // TODO route scenario execution: {$route} (metadata only until route scenario test execution is implemented)\n";
+            $php .= '    // '.$this->commentLine("Route replay expected: {$route}")."\n";
         }
 
         $php .= "\n"
@@ -56,8 +56,24 @@ final class ScenarioPestTestWriter
             ."        '--exact' => true,\n"
             ."    ])\n";
 
-        foreach ($scenario->captures as $capture) {
-            $php .= "        ->expectsOutputToContain(".$this->exportString("Capture: {$capture}").")\n";
+        if ($scenario->seed !== null) {
+            $php .= "        ->expectsOutputToContain(".$this->exportString("Seed: {$scenario->seed}").")\n";
+        }
+
+        if ($scenario->captures === []) {
+            $php .= "        ->expectsOutputToContain('Captures: none')\n";
+        } else {
+            foreach ($scenario->captures as $capture) {
+                $php .= "        ->expectsOutputToContain(".$this->exportString("Capture: {$capture}").")\n";
+            }
+        }
+
+        if ($scenario->routes === []) {
+            $php .= "        ->expectsOutputToContain('Routes: none')\n";
+        } else {
+            foreach ($scenario->routes as $route) {
+                $php .= "        ->expectsOutputToContain(".$this->exportString("Route: {$route} HTTP ").")\n";
+            }
         }
 
         $php .= "        ->assertExitCode(0);\n"
@@ -99,6 +115,11 @@ final class ScenarioPestTestWriter
     private function exportString(string $value): string
     {
         return var_export($value, true);
+    }
+
+    private function commentLine(string $value): string
+    {
+        return str_replace('?>', '? >', str_replace(["\r", "\n"], ' ', $value));
     }
 
     private function safeSegment(string $value): string

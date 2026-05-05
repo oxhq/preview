@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Tests\Scenario;
 
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 use Oxhq\Preview\Scenario\Scenario;
 use Oxhq\Preview\Scenario\ScenarioRunner;
 use Oxhq\Preview\Tests\TestCase;
@@ -100,6 +103,110 @@ PHP);
         $this->assertSame(0, ScenarioRouteCompositionListener::$calls);
     }
 
+    public function test_route_context_is_applied_to_scenario_route_preview_execution(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+        $this->useInMemoryDatabase();
+
+        Route::get('/scenario/route-context', function () {
+            DB::table('preview_scenario_writes')->insert(['message' => 'mutated']);
+
+            return response()->json([
+                'tenant' => session('tenant'),
+                'mode' => request()->attributes->get('preview.session')['mode'] ?? null,
+                'guard' => request()->attributes->get('preview.guard'),
+                'readonly' => request()->attributes->get('preview.readonly_db'),
+            ]);
+        })->name('preview.scenario.route-context');
+
+        $this->writeScenario($path, 'route-context.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'route-context',
+    routes: ['preview.scenario.route-context'],
+    routeContext: [
+        'preview.scenario.route-context' => [
+            'session' => [
+                'tenant' => 'acme',
+                'mode' => 'review',
+            ],
+            'guard' => 'client',
+            'readonly_db' => true,
+        ],
+    ],
+);
+PHP);
+
+        $result = $this->app->make(ScenarioRunner::class)->replay('route-context', 'exact');
+
+        $this->assertSame([
+            'tenant' => 'acme',
+            'mode' => 'review',
+        ], $result->routes[0]->preview->session);
+        $this->assertSame('client', $result->routes[0]->preview->guard);
+        $this->assertTrue($result->routes[0]->preview->readonlyDb);
+        $this->assertSame(200, $result->routes[0]->response->getStatusCode());
+        $this->assertSame(
+            '{"tenant":"acme","mode":"review","guard":"client","readonly":true}',
+            $result->routes[0]->response->getContent(),
+        );
+        $this->assertSame(0, DB::table('preview_scenario_writes')->count());
+    }
+
+    public function test_route_context_auth_and_fakes_are_merged_with_scenario_fakes(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+        ScenarioRouteCompositionUser::$users = [
+            '42' => new ScenarioRouteCompositionUser(['id' => '42', 'name' => 'Ada']),
+        ];
+        config()->set('auth.guards.preview', [
+            'driver' => 'session',
+            'provider' => 'users',
+        ]);
+
+        Route::get('/scenario/auth-context', fn () => response()->json([
+            'request_user' => request()->user()?->getAuthIdentifier(),
+            'request_guard_user' => request()->user('preview')?->getAuthIdentifier(),
+        ]))->name('preview.scenario.auth-context');
+
+        $this->writeScenario($path, 'auth-context.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+use Oxhq\Preview\Tests\Scenario\ScenarioRouteCompositionUser;
+
+return new Scenario(
+    name: 'auth-context',
+    routes: ['preview.scenario.auth-context'],
+    fakes: ['events'],
+    routeContext: [
+        'preview.scenario.auth-context' => [
+            'guard' => 'preview',
+            'user_id' => '42',
+            'user_model' => ScenarioRouteCompositionUser::class,
+            'fakes' => ['mail', 'events'],
+        ],
+    ],
+);
+PHP);
+
+        $result = $this->app->make(ScenarioRunner::class)->replay('auth-context', 'exact');
+
+        $this->assertSame(['events', 'mail'], $result->routes[0]->preview->fakes);
+        $this->assertSame('42', $result->routes[0]->preview->userId);
+        $this->assertSame(ScenarioRouteCompositionUser::class, $result->routes[0]->preview->userModel);
+        $this->assertSame(200, $result->routes[0]->response->getStatusCode());
+        $this->assertSame(
+            '{"request_user":"42","request_guard_user":"42"}',
+            $result->routes[0]->response->getContent(),
+        );
+    }
+
     public function test_missing_route_parameters_fail_clearly(): void
     {
         $path = $this->scenarioPath();
@@ -163,6 +270,24 @@ PHP);
 
         return $file;
     }
+
+    private function useInMemoryDatabase(): void
+    {
+        $this->app['config']->set('database.default', 'preview_testing');
+        $this->app['config']->set('database.connections.preview_testing', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ]);
+
+        DB::purge('preview_testing');
+        DB::connection('preview_testing')->getPdo();
+
+        Schema::connection('preview_testing')->create('preview_scenario_writes', function (Blueprint $table): void {
+            $table->increments('id');
+            $table->string('message');
+        });
+    }
 }
 
 final class ScenarioRouteCompositionEvent
@@ -176,5 +301,18 @@ final class ScenarioRouteCompositionListener
     public function handle(ScenarioRouteCompositionEvent $event): void
     {
         self::$calls++;
+    }
+}
+
+final class ScenarioRouteCompositionUser extends \Illuminate\Auth\GenericUser
+{
+    /**
+     * @var array<string, self>
+     */
+    public static array $users = [];
+
+    public static function find(string $id): ?\Illuminate\Contracts\Auth\Authenticatable
+    {
+        return self::$users[$id] ?? null;
     }
 }

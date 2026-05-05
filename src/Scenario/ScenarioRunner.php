@@ -68,10 +68,16 @@ final class ScenarioRunner
 
         foreach ($scenario->routes as $routeName) {
             $parameters = $this->routeParameters($scenario, $routeName);
+            $context = $this->routeContext($scenario, $routeName);
             $preview = $this->routes->preview(
                 routeName: $routeName,
                 parameters: $parameters,
-                fakes: $scenario->fakes,
+                readonlyDb: (bool) ($context['readonly_db'] ?? false),
+                guard: $context['guard'] ?? null,
+                session: $context['session'] ?? [],
+                userId: $context['user_id'] ?? null,
+                userModel: $context['user_model'] ?? null,
+                fakes: array_values(array_unique(array_merge($scenario->fakes, $context['fakes'] ?? []))),
             );
             $request = Request::create($preview->url, $preview->executionMethod);
             $response = $this->kernel->handle($request);
@@ -106,6 +112,16 @@ final class ScenarioRunner
         }
 
         return $normalized;
+    }
+
+    /**
+     * @return array{session?: array<string, string>, guard?: string, user_id?: string, user_model?: class-string|string, readonly_db?: bool, fakes?: list<string>}
+     */
+    private function routeContext(Scenario $scenario, string $routeName): array
+    {
+        $context = $scenario->routeContext[$routeName] ?? [];
+
+        return is_array($context) ? $context : [];
     }
 
     private function runSeed(Scenario $scenario): void

@@ -89,6 +89,7 @@ final class ScenarioRepository
             captures: $this->normalizeList($scenario->captures),
             fakes: $this->normalizeFakes($scenario->fakes, $file),
             notes: $scenario->notes === null || trim($scenario->notes) === '' ? null : trim($scenario->notes),
+            routeContext: $this->normalizeRouteContext($scenario->routeContext, $file),
         );
     }
 
@@ -119,7 +120,7 @@ final class ScenarioRepository
      * @param list<string|mixed> $fakes
      * @return list<string>
      */
-    private function normalizeFakes(array $fakes, string $file): array
+    private function normalizeFakes(array $fakes, string $file, ?string $routeName = null): array
     {
         $allowed = ['queue', 'mail', 'http', 'events'];
         $normalized = [];
@@ -136,9 +137,12 @@ final class ScenarioRepository
             }
 
             if (! in_array($fake, $allowed, true)) {
+                $location = $routeName === null ? '' : " route [{$routeName}]";
+
                 throw new RuntimeException(sprintf(
-                    'Scenario file [%s] defines unsupported fake [%s]. Supported fakes: queue, mail, http, events.',
+                    'Scenario file [%s]%s defines unsupported fake [%s]. Supported fakes: queue, mail, http, events.',
                     $file,
+                    $location,
                     $fake,
                 ));
             }
@@ -147,5 +151,146 @@ final class ScenarioRepository
         }
 
         return array_values(array_unique($normalized));
+    }
+
+    /**
+     * @param array<string, mixed> $routeContext
+     * @return array<string, array{session?: array<string, string>, guard?: string, user_id?: string, user_model?: class-string|string, readonly_db?: bool, fakes?: list<string>}>
+     */
+    private function normalizeRouteContext(array $routeContext, string $file): array
+    {
+        $normalized = [];
+
+        foreach ($routeContext as $routeName => $context) {
+            if (! is_scalar($routeName)) {
+                continue;
+            }
+
+            $routeName = trim((string) $routeName);
+
+            if ($routeName === '') {
+                continue;
+            }
+
+            if (! is_array($context)) {
+                throw new RuntimeException(sprintf(
+                    'Scenario file [%s] route [%s] context must be an array.',
+                    $file,
+                    $routeName,
+                ));
+            }
+
+            $normalized[$routeName] = $this->normalizeSingleRouteContext($context, $file, $routeName);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array{session?: array<string, string>, guard?: string, user_id?: string, user_model?: class-string|string, readonly_db?: bool, fakes?: list<string>}
+     */
+    private function normalizeSingleRouteContext(array $context, string $file, string $routeName): array
+    {
+        $normalized = [];
+
+        foreach ($context as $key => $value) {
+            if (! is_string($key)) {
+                continue;
+            }
+
+            $key = match ($key) {
+                'readonlyDb' => 'readonly_db',
+                'userId' => 'user_id',
+                'userModel' => 'user_model',
+                default => $key,
+            };
+
+            if ($key === 'session') {
+                $normalized['session'] = is_array($value)
+                    ? $this->normalizeStringMap($value)
+                    : $this->invalidRouteContext($file, $routeName, $key, 'an array');
+
+                continue;
+            }
+
+            if (in_array($key, ['guard', 'user_id', 'user_model'], true)) {
+                $value = $this->normalizeOptionalString($value);
+
+                if ($value !== null) {
+                    $normalized[$key] = $value;
+                }
+
+                continue;
+            }
+
+            if ($key === 'readonly_db') {
+                $normalized['readonly_db'] = is_bool($value)
+                    ? $value
+                    : $this->invalidRouteContext($file, $routeName, $key, 'a boolean');
+
+                continue;
+            }
+
+            if ($key === 'fakes') {
+                $normalized['fakes'] = is_array($value)
+                    ? $this->normalizeFakes($value, $file, $routeName)
+                    : $this->invalidRouteContext($file, $routeName, $key, 'an array');
+
+                continue;
+            }
+
+            $this->invalidRouteContext($file, $routeName, $key, 'a supported key');
+        }
+
+        return array_filter(
+            $normalized,
+            fn (mixed $value): bool => ! ($value === [] || $value === null),
+        );
+    }
+
+    /**
+     * @param array<string|int, mixed> $values
+     * @return array<string, string>
+     */
+    private function normalizeStringMap(array $values): array
+    {
+        $normalized = [];
+
+        foreach ($values as $key => $value) {
+            if (! is_scalar($key) || ! is_scalar($value)) {
+                continue;
+            }
+
+            $key = trim((string) $key);
+
+            if ($key !== '') {
+                $normalized[$key] = (string) $value;
+            }
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeOptionalString(mixed $value): ?string
+    {
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    }
+
+    private function invalidRouteContext(string $file, string $routeName, string $key, string $expected): never
+    {
+        throw new RuntimeException(sprintf(
+            'Scenario file [%s] route [%s] context key [%s] must be %s.',
+            $file,
+            $routeName,
+            $key,
+            $expected,
+        ));
     }
 }

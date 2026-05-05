@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Oxhq\Preview\Tests\Commands;
 
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Oxhq\Preview\Tests\TestCase;
 
 final class ScenarioReplayRouteCommandTest extends TestCase
@@ -40,6 +43,51 @@ PHP);
             ->expectsOutput('Route: preview.scenario-command.accounts.show HTTP 200')
             ->expectsOutput('Route output: command-output:acme')
             ->assertExitCode(0);
+    }
+
+    public function test_preview_scenario_replay_executes_routes_with_route_context(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+        $this->useInMemoryDatabase();
+
+        Route::get('/scenario-command/context', function (): string {
+            DB::table('preview_command_writes')->insert(['message' => 'mutated']);
+
+            return sprintf(
+                'tenant:%s readonly:%s',
+                session('tenant'),
+                request()->attributes->get('preview.readonly_db') ? 'yes' : 'no',
+            );
+        })->name('preview.scenario-command.context');
+
+        $this->writeScenario($path, 'command-context.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'command-context',
+    routes: ['preview.scenario-command.context'],
+    routeContext: [
+        'preview.scenario-command.context' => [
+            'session' => ['tenant' => 'acme'],
+            'readonly_db' => true,
+        ],
+    ],
+);
+PHP);
+
+        $this->artisan('preview:scenario:replay', [
+            'scenario' => 'command-context',
+            '--exact' => true,
+        ])
+            ->expectsOutput('Scenario replay ready for [command-context] using [exact].')
+            ->expectsOutput('Route: preview.scenario-command.context HTTP 200')
+            ->expectsOutput('Route output: tenant:acme readonly:yes')
+            ->assertExitCode(0);
+
+        $this->assertSame(0, DB::table('preview_command_writes')->count());
     }
 
     public function test_preview_scenario_replay_reports_missing_route_parameters_clearly(): void
@@ -108,5 +156,23 @@ PHP);
         file_put_contents($file, $contents);
 
         return $file;
+    }
+
+    private function useInMemoryDatabase(): void
+    {
+        $this->app['config']->set('database.default', 'preview_testing');
+        $this->app['config']->set('database.connections.preview_testing', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ]);
+
+        DB::purge('preview_testing');
+        DB::connection('preview_testing')->getPdo();
+
+        Schema::connection('preview_testing')->create('preview_command_writes', function (Blueprint $table): void {
+            $table->increments('id');
+            $table->string('message');
+        });
     }
 }
