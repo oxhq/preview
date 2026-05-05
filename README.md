@@ -21,6 +21,8 @@ Local readiness summary:
 ```bash
 php artisan preview:doctor
 php artisan preview:doctor --json
+php artisan preview:config
+php artisan preview:config --json
 ```
 
 Before the package is published, install it from a Laravel app through a Composer path repository:
@@ -117,6 +119,8 @@ php artisan preview:capture:stats
 php artisan preview:capture:stats --json
 php artisan preview:capture:verify {capture}
 php artisan preview:capture:verify {capture} --json
+php artisan preview:capture:export {capture}
+php artisan preview:capture:export {capture} --path=storage/preview/exports --json
 php artisan preview:capture:replay {capture} --exact
 php artisan preview:capture:replay {capture} --exact --json
 php artisan preview:capture:replay {capture} --resign
@@ -137,6 +141,8 @@ secret header values.
 raw headers, so redacted metadata cannot accidentally change the verification result.
 `preview:capture:stats` summarizes the local capture inventory by provider, event type,
 verification state, and capture time range.
+`preview:capture:export` writes a redacted metadata-only export. It does not copy raw
+payloads, raw headers, or local secret-bearing files.
 Capture pruning requires an explicit date cutoff and only deletes directories resolved
 inside the configured capture storage root. Use `--dry-run` first when inspecting local
 state.
@@ -162,7 +168,12 @@ Generated fixture manifests can be listed without reading payload files:
 ```bash
 php artisan preview:fixture:list
 php artisan preview:fixture:list --json
+php artisan preview:fixture:doctor
+php artisan preview:fixture:doctor --json
 ```
+
+`preview:fixture:doctor` validates fixture manifests and companion file references
+without reading payload bodies or generated header fixtures.
 
 ## Route Preview
 
@@ -172,6 +183,8 @@ execution through Laravel Preview's signed route endpoint.
 ```bash
 php artisan preview:route:list
 php artisan preview:route:list --filter=billing --json
+php artisan preview:route:doctor
+php artisan preview:route:doctor --json
 
 php artisan preview:route billing.portal \
   --ttl=2h \
@@ -189,6 +202,9 @@ php artisan preview:route billing.portal \
 
 `preview:route:list` inspects named route metadata and flags write-method routes without
 creating signed links or executing route actions.
+`preview:route:doctor` reports route-preview readiness, configured path, named route
+counts, write-route warnings, supported fakes, and signing prerequisites without
+executing routes.
 
 Safety boundaries are explicit:
 
@@ -257,6 +273,8 @@ php artisan preview:scenario:list
 php artisan preview:scenario:list --json
 php artisan preview:scenario:show subscription-renewal
 php artisan preview:scenario:show subscription-renewal --json
+php artisan preview:scenario:stats
+php artisan preview:scenario:stats --json
 php artisan preview:scenario:validate subscription-renewal
 php artisan preview:scenario:validate subscription-renewal --json
 php artisan preview:scenario:validate --all
@@ -273,6 +291,8 @@ routes through the same signed route-preview safety layer. Replay prints a summa
 seed, capture, dispatch, and route counts, and failures include the failing dispatch or
 route when a partial result exists. Scenario fakes are forwarded to route preview; they do
 not provide broader isolation than the route-preview fake flags.
+`preview:scenario:stats` summarizes the local scenario inventory without loading
+application state beyond scenario files and without executing seeds, routes, or captures.
 `preview:scenario:validate` checks seed classes, capture references, named routes, route
 parameters, and route expectation references without running seeders, executing routes, or
 replaying traffic.
