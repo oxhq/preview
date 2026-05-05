@@ -43,6 +43,7 @@ final class FixtureWriterTest extends TestCase
 
         $headers = file_get_contents($root.'/fixtures/stripe/checkout-session-completed/headers.php');
         $fixture = file_get_contents($root.'/fixtures/stripe/checkout-session-completed/fixture.php');
+        $manifest = json_decode((string) file_get_contents($writer->manifestPath($record)), true);
         $loaded = PreviewFixture::load($root.'/fixtures/stripe/checkout-session-completed/fixture.php');
 
         $this->assertStringNotContainsString('Authorization', (string) $headers);
@@ -54,6 +55,26 @@ final class FixtureWriterTest extends TestCase
         $this->assertFileDoesNotExist($root.'/fixtures/stripe/checkout-session-completed/payload.json');
         $this->assertFileExists($root.'/fixtures/.local/stripe/checkout-session-completed/payload.json');
         $this->assertSame('{"id":1}', $loaded->rawBody());
+        $this->assertSame([
+            'capture_id' => 'cap_1',
+            'provider' => 'stripe',
+            'event_type' => 'checkout.session.completed',
+            'method' => 'POST',
+            'endpoint' => '/webhook/stripe',
+            'signing' => 'resign',
+            'fixture_context' => [],
+            'payload' => [
+                'local_only' => true,
+            ],
+            'headers' => [
+                'Stripe-Signature' => 'old',
+            ],
+            'redacted_headers' => [
+                'Authorization',
+                'Cookie',
+                'Set-Cookie',
+            ],
+        ], $manifest);
     }
 
     public function test_it_writes_hmac_fixture_context_without_shared_secret(): void
@@ -87,6 +108,7 @@ final class FixtureWriterTest extends TestCase
         $writer->write($record, providerCanSign: true);
 
         $fixture = file_get_contents($root.'/fixtures/hmac/event-created/fixture.php');
+        $manifest = json_decode((string) file_get_contents($writer->manifestPath($record)), true);
 
         $this->assertStringContainsString("'signature_header' => 'X-Custom-Signature'", (string) $fixture);
         $this->assertStringContainsString("'algorithm' => 'sha256'", (string) $fixture);
@@ -95,6 +117,10 @@ final class FixtureWriterTest extends TestCase
             'signature_header' => 'X-Custom-Signature',
             'algorithm' => 'sha256',
         ], PreviewFixture::load($root.'/fixtures/hmac/event-created/fixture.php')->fixtureContext());
+        $this->assertSame([
+            'signature_header' => 'X-Custom-Signature',
+            'algorithm' => 'sha256',
+        ], $manifest['fixture_context']);
     }
 
     public function test_it_keeps_payload_commit_ready_when_no_sensitive_headers_are_present(): void
@@ -121,9 +147,64 @@ final class FixtureWriterTest extends TestCase
         $writer = new FixtureWriter($root.'/fixtures');
         $writer->write($record);
 
+        $manifest = json_decode((string) file_get_contents($writer->manifestPath($record)), true);
+
         $this->assertFileExists($root.'/fixtures/generic/event-created/payload.json');
         $this->assertFileDoesNotExist($root.'/fixtures/.local/generic/event-created/payload.json');
         $this->assertSame('{"id":1}', PreviewFixture::load($root.'/fixtures/generic/event-created/fixture.php')->rawBody());
+        $this->assertSame([
+            'capture_id' => 'cap_generic',
+            'provider' => 'generic',
+            'event_type' => 'event.created',
+            'method' => 'POST',
+            'endpoint' => '/webhook/generic',
+            'signing' => 'exact',
+            'fixture_context' => [],
+            'payload' => [
+                'local_only' => false,
+            ],
+            'headers' => [
+                'X-Preview-Event' => 'event.created',
+            ],
+            'redacted_headers' => [],
+        ], $manifest);
+    }
+
+    public function test_it_lists_configured_redacted_header_names_without_secret_values_in_manifest(): void
+    {
+        $root = sys_get_temp_dir().'/preview-fixtures-'.bin2hex(random_bytes(4));
+        $body = $root.'/capture-body.raw';
+        mkdir($root, 0775, true);
+        file_put_contents($body, '{"id":1}');
+
+        $record = new CaptureRecord(
+            id: 'cap_redacted',
+            provider: 'generic',
+            eventType: 'event.created',
+            method: 'POST',
+            path: '/webhook/generic',
+            query: [],
+            headers: [
+                'X-Api-Key' => 'secret-value',
+                'X-Preview-Event' => 'event.created',
+            ],
+            rawBodyPath: $body,
+            capturedAt: new DateTimeImmutable(),
+            verified: true,
+            metadata: ['fixture_name' => 'event-created'],
+        );
+
+        $writer = new FixtureWriter($root.'/fixtures', new \Oxhq\Preview\Core\RedactionPolicy(['X-Api-Key']));
+        $writer->write($record);
+
+        $manifestContents = (string) file_get_contents($writer->manifestPath($record));
+        $manifest = json_decode($manifestContents, true);
+
+        $this->assertStringNotContainsString('secret-value', $manifestContents);
+        $this->assertSame([
+            'X-Preview-Event' => 'event.created',
+        ], $manifest['headers']);
+        $this->assertSame(['X-Api-Key'], $manifest['redacted_headers']);
     }
 
     public function test_it_gitignores_local_only_fixture_payloads_inside_git_roots(): void

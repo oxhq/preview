@@ -80,6 +80,28 @@ final class CaptureRepository
         return CaptureRecord::fromArray($data);
     }
 
+    public function metadataFilePath(string $id): string
+    {
+        return $this->metadataPath($id);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function metadataFilePaths(): array
+    {
+        $root = $this->storageRoot();
+
+        if (! is_dir($root)) {
+            return [];
+        }
+
+        $paths = glob($root.DIRECTORY_SEPARATOR.'*'.DIRECTORY_SEPARATOR.'metadata.json') ?: [];
+        sort($paths);
+
+        return array_values($paths);
+    }
+
     /**
      * @return list<CaptureRecord>
      */

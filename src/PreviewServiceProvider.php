@@ -7,19 +7,23 @@ namespace Oxhq\Preview;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Oxhq\Preview\Commands\CaptureCommand;
+use Oxhq\Preview\Commands\CaptureDoctorCommand;
 use Oxhq\Preview\Commands\CaptureFixtureCommand;
 use Oxhq\Preview\Commands\CaptureListCommand;
 use Oxhq\Preview\Commands\CapturePruneCommand;
 use Oxhq\Preview\Commands\CaptureReplayCommand;
 use Oxhq\Preview\Commands\CaptureShowCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
+use Oxhq\Preview\Commands\ProviderDoctorCommand;
 use Oxhq\Preview\Commands\ProviderListCommand;
+use Oxhq\Preview\Commands\RouteListCommand;
 use Oxhq\Preview\Commands\RoutePreviewCommand;
 use Oxhq\Preview\Commands\ScenarioListCommand;
 use Oxhq\Preview\Commands\ScenarioMakeCommand;
 use Oxhq\Preview\Commands\ScenarioReplayCommand;
 use Oxhq\Preview\Commands\ScenarioShowCommand;
 use Oxhq\Preview\Commands\ScenarioTestCommand;
+use Oxhq\Preview\Commands\ScenarioValidateCommand;
 use Oxhq\Preview\Commands\TransportDoctorCommand;
 use Oxhq\Preview\Commands\TransportListCommand;
 use Oxhq\Preview\Capture\CaptureRepository;
@@ -187,19 +191,23 @@ class PreviewServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 CaptureCommand::class,
+                CaptureDoctorCommand::class,
                 CaptureFixtureCommand::class,
                 CaptureListCommand::class,
                 CapturePruneCommand::class,
                 CaptureReplayCommand::class,
                 CaptureShowCommand::class,
                 CaptureTestCommand::class,
+                ProviderDoctorCommand::class,
                 ProviderListCommand::class,
+                RouteListCommand::class,
                 RoutePreviewCommand::class,
                 ScenarioListCommand::class,
                 ScenarioMakeCommand::class,
                 ScenarioReplayCommand::class,
                 ScenarioShowCommand::class,
                 ScenarioTestCommand::class,
+                ScenarioValidateCommand::class,
                 TransportDoctorCommand::class,
                 TransportListCommand::class,
             ]);

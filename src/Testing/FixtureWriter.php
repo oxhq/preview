@@ -11,6 +11,9 @@ use RuntimeException;
 
 final class FixtureWriter
 {
+    /** @var list<string> */
+    private const SECRET_HEADER_NAMES = ['authorization', 'cookie', 'set-cookie'];
+
     public function __construct(
         private readonly ?string $fixturePath = null,
         private readonly ?RedactionPolicy $redactionPolicy = null,
@@ -24,6 +27,8 @@ final class FixtureWriter
         $payload = $this->payloadLocation($record);
         $headersPath = $directory.DIRECTORY_SEPARATOR.'headers.php';
         $fixturePath = $directory.DIRECTORY_SEPARATOR.'fixture.php';
+        $manifestPath = $this->manifestPath($record);
+        $safeHeaders = $this->safeHeaders($record->headers);
 
         $this->ensureDirectory($directory);
         $this->ensureDirectory(dirname($payload['path']));
@@ -33,8 +38,9 @@ final class FixtureWriter
         }
 
         file_put_contents($payload['path'], $record->rawBody());
-        file_put_contents($headersPath, "<?php\n\nreturn ".$this->exportArray($this->safeHeaders($record->headers)).";\n");
+        file_put_contents($headersPath, "<?php\n\nreturn ".$this->exportArray($safeHeaders).";\n");
         file_put_contents($fixturePath, $this->fixturePhp($record, $providerCanSign, $payload['expression']));
+        file_put_contents($manifestPath, $this->manifestJson($record, $providerCanSign, $payload['local_only'], $safeHeaders));
 
         return PreviewFixture::load($fixturePath);
     }
@@ -44,10 +50,13 @@ final class FixtureWriter
         return $this->fixtureDirectory($record).DIRECTORY_SEPARATOR.'fixture.php';
     }
 
+    public function manifestPath(CaptureRecord $record): string
+    {
+        return $this->fixtureDirectory($record).DIRECTORY_SEPARATOR.'manifest.json';
+    }
+
     private function fixturePhp(CaptureRecord $record, bool $providerCanSign, string $payloadExpression): string
     {
-        $signing = $providerCanSign ? 'resign' : 'exact';
-
         return "<?php\n\nuse Oxhq\\Preview\\Testing\\PreviewFixture;\n\nreturn PreviewFixture::provider(".$this->exportString($record->provider).")\n"
             ."    ->event(".$this->exportNullableString($record->eventType).")\n"
             ."    ->fixtureContext(".$this->exportArray($this->fixtureContext($record)).")\n"
@@ -55,8 +64,40 @@ final class FixtureWriter
             ."    ->method(".$this->exportString($record->method).")\n"
             ."    ->rawBody({$payloadExpression})\n"
             ."    ->headers(__DIR__.'/headers.php')\n"
-            ."    ->signing(".$this->exportString($signing).")\n"
+            ."    ->signing(".$this->exportString($this->signingMode($providerCanSign)).")\n"
             ."    ->assertsOk();\n";
+    }
+
+    /**
+     * @param array<string, mixed> $safeHeaders
+     */
+    private function manifestJson(CaptureRecord $record, bool $providerCanSign, bool $payloadLocalOnly, array $safeHeaders): string
+    {
+        $json = json_encode([
+            'capture_id' => $record->id,
+            'provider' => $record->provider,
+            'event_type' => $record->eventType,
+            'method' => strtoupper($record->method),
+            'endpoint' => $record->path,
+            'signing' => $this->signingMode($providerCanSign),
+            'fixture_context' => $this->fixtureContext($record),
+            'payload' => [
+                'local_only' => $payloadLocalOnly,
+            ],
+            'headers' => $this->manifestHeaders($safeHeaders),
+            'redacted_headers' => $this->redactedHeaderNames($record->headers, $safeHeaders),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        if ($json === false) {
+            throw new RuntimeException("Fixture manifest for capture [{$record->id}] could not be encoded.");
+        }
+
+        return $json."\n";
+    }
+
+    private function signingMode(bool $providerCanSign): string
+    {
+        return $providerCanSign ? 'resign' : 'exact';
     }
 
     private function fixtureDirectory(CaptureRecord $record): string
@@ -107,7 +148,7 @@ final class FixtureWriter
     private function payloadShouldBeLocalOnly(CaptureRecord $record): bool
     {
         foreach ($record->headers as $name => $value) {
-            if (in_array(strtolower((string) $name), ['authorization', 'cookie', 'set-cookie'], true)) {
+            if ($this->isSecretHeaderName((string) $name)) {
                 return true;
             }
 
@@ -168,12 +209,56 @@ final class FixtureWriter
         $headers = $this->redactionPolicy !== null ? $this->redactionPolicy->redactHeaders($headers) : $headers;
 
         foreach (array_keys($headers) as $name) {
-            if (in_array(strtolower((string) $name), ['authorization', 'cookie', 'set-cookie'], true)) {
+            if ($this->isSecretHeaderName((string) $name)) {
                 unset($headers[$name]);
             }
         }
 
         return $headers;
+    }
+
+    /**
+     * @param array<string, mixed> $headers
+     * @return array<string, mixed>
+     */
+    private function manifestHeaders(array $headers): array
+    {
+        foreach ($headers as $name => $value) {
+            if ($this->containsRedactedValue($value)) {
+                unset($headers[$name]);
+            }
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @param array<string, mixed> $originalHeaders
+     * @param array<string, mixed> $safeHeaders
+     * @return list<string>
+     */
+    private function redactedHeaderNames(array $originalHeaders, array $safeHeaders): array
+    {
+        $redacted = [];
+
+        foreach (array_keys($originalHeaders) as $name) {
+            if ($this->isSecretHeaderName((string) $name)) {
+                $redacted[(string) $name] = (string) $name;
+            }
+        }
+
+        foreach ($safeHeaders as $name => $value) {
+            if ($this->containsRedactedValue($value)) {
+                $redacted[(string) $name] = (string) $name;
+            }
+        }
+
+        return array_values($redacted);
+    }
+
+    private function isSecretHeaderName(string $name): bool
+    {
+        return in_array(strtolower($name), self::SECRET_HEADER_NAMES, true);
     }
 
     /**

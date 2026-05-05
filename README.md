@@ -65,7 +65,12 @@ Inspect registered providers without starting any live traffic:
 ```bash
 php artisan preview:provider:list
 php artisan preview:provider:list --json
+php artisan preview:provider:doctor
+php artisan preview:provider:doctor --json
 ```
+
+`preview:provider:doctor` reports provider capabilities and whether built-in provider
+secrets still use placeholder values. It does not print secret values.
 
 ## Capture
 
@@ -98,6 +103,9 @@ php artisan preview:capture stripe --transport=stripe-cli --live --local-url=htt
 php artisan preview:capture:list
 php artisan preview:capture:list --json
 php artisan preview:capture:show {capture}
+php artisan preview:capture:doctor
+php artisan preview:capture:doctor --capture={capture}
+php artisan preview:capture:doctor --json
 php artisan preview:capture:replay {capture} --exact
 php artisan preview:capture:replay {capture} --exact --json
 php artisan preview:capture:replay {capture} --resign
@@ -111,6 +119,9 @@ php artisan preview:capture:prune --before=2026-05-01
 
 Raw captures stay local. Metadata and generated fixtures redact configured sensitive
 headers such as cookies and authorization values.
+`preview:capture:doctor` checks capture metadata, raw body files, raw header files,
+registered provider references, and redaction state without printing raw payloads or
+secret header values.
 Capture pruning requires an explicit date cutoff and only deletes directories resolved
 inside the configured capture storage root. Use `--dry-run` first when inspecting local
 state.
@@ -137,6 +148,9 @@ Route preview creates signed, time-limited links for named Laravel routes and pr
 execution through Laravel Preview's signed route endpoint.
 
 ```bash
+php artisan preview:route:list
+php artisan preview:route:list --filter=billing --json
+
 php artisan preview:route billing.portal \
   --ttl=2h \
   --param=id=123 \
@@ -150,6 +164,9 @@ php artisan preview:route billing.portal \
   --fake-http \
   --fake-events
 ```
+
+`preview:route:list` inspects named route metadata and flags write-method routes without
+creating signed links or executing route actions.
 
 Safety boundaries are explicit:
 
@@ -218,6 +235,8 @@ php artisan preview:scenario:list
 php artisan preview:scenario:list --json
 php artisan preview:scenario:show subscription-renewal
 php artisan preview:scenario:show subscription-renewal --json
+php artisan preview:scenario:validate subscription-renewal
+php artisan preview:scenario:validate subscription-renewal --json
 php artisan preview:scenario:replay subscription-renewal --exact
 php artisan preview:scenario:replay subscription-renewal --exact --json
 php artisan preview:scenario:replay subscription-renewal --resign
@@ -230,9 +249,16 @@ routes through the same signed route-preview safety layer. Replay prints a summa
 seed, capture, dispatch, and route counts, and failures include the failing dispatch or
 route when a partial result exists. Scenario fakes are forwarded to route preview; they do
 not provide broader isolation than the route-preview fake flags.
+`preview:scenario:validate` checks seed classes, capture references, named routes, route
+parameters, and route expectation references without running seeders, executing routes, or
+replaying traffic.
 Configured route expectations are enforced during replay, so a route that returns the
 wrong status or misses required response text fails the replay even if the response is
 otherwise a 2xx.
+
+Fixture generation writes a `manifest.json` next to each generated fixture. The manifest
+contains capture metadata, signing mode, fixture context, payload locality, and safe
+headers only; it excludes raw bodies and sensitive header values.
 
 Generated scenario tests are Pest-compatible and local-first. They are meant to fail
 clearly when the host app lacks required routes, models, provider secrets, seed data, or
