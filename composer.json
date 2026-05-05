@@ -57,6 +57,8 @@
     "archive": {
         "exclude": [
             "/.github",
+            "/.gitattributes",
+            "/.gitignore",
             "/.phpunit.result.cache",
             "/.preview-internal",
             "/phpunit.xml",
@@ -69,8 +71,10 @@
             "php scripts/check-release-surface.php",
             "phpunit"
         ],
+        "release:dist": "php scripts/check-dist-archive.php",
         "release:github": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-github-release.ps1",
         "release:packagist": "php scripts/check-packagist.php",
+        "release:prepare": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-release.ps1",
         "release:check": "php scripts/check-release-surface.php",
         "smoke:consumer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-consumer.ps1",
         "smoke:packagist-install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-packagist-install.ps1",

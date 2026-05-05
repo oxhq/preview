@@ -343,6 +343,8 @@ Run local verification:
 ```bash
 composer ci
 composer release:check
+composer release:dist
+composer release:prepare -- -Version v0.1.0
 composer release:github -- -Version v0.1.0
 composer release:packagist -- v0.1.0
 composer test

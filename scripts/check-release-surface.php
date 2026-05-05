@@ -41,10 +41,16 @@ if (is_file($composerPath)) {
 $check(is_file($path('README.md')), 'README.md exists');
 $check(is_file($path('CHANGELOG.md')), 'CHANGELOG.md exists');
 $check(is_file($path('RELEASE.md')), 'RELEASE.md exists');
+$check(is_file($path('SECURITY.md')), 'SECURITY.md exists');
+$check(is_file($path('SUPPORT.md')), 'SUPPORT.md exists');
+$check(is_file($path('.gitattributes')), '.gitattributes exists');
+$check(is_file($path('.github/dependabot.yml')), '.github/dependabot.yml exists');
 $check(is_file($path('.github/workflows/ci.yml')), '.github/workflows/ci.yml exists');
 $check(is_file($path('.github/workflows/release.yml')), '.github/workflows/release.yml exists');
+$check(is_file($path('scripts/check-dist-archive.php')), 'scripts/check-dist-archive.php exists');
 $check(is_file($path('scripts/check-github-release.ps1')), 'scripts/check-github-release.ps1 exists');
 $check(is_file($path('scripts/check-packagist.php')), 'scripts/check-packagist.php exists');
+$check(is_file($path('scripts/prepare-release.ps1')), 'scripts/prepare-release.ps1 exists');
 $check(is_file($path('scripts/smoke-packagist-install.ps1')), 'scripts/smoke-packagist-install.ps1 exists');
 
 $readmePath = $path('README.md');

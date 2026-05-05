@@ -6,6 +6,7 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
 
 - Run local package checks from the repository root:
   - `composer ci`
+  - `composer release:dist`
 - Run a clean consumer smoke in a separate Laravel app using a local path repository for `oxhq/preview`:
   - `composer smoke:consumer`
 - In the consumer app, confirm the service provider registers and the core commands run:
@@ -21,11 +22,13 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
   - confirm Laravel Preview captures the event locally
   - replay or generate a test from the captured event
 - Confirm GitHub Actions CI is green for the exact commit that will be tagged.
+- Prepare the tag locally after the worktree is clean and hosted CI is green:
+  - `composer release:prepare -- -Version v0.1.0`
 
 ## Publish
 
-- Tag the release from the verified commit.
-- Push the tag to GitHub.
+- Push the verified tag:
+  - `composer release:prepare -- -Version v0.1.0 -PushTag`
 - Confirm the GitHub Release and tag state:
   - `composer release:github -- -Version v0.1.0`
 - Confirm Packagist sees `oxhq/preview` and exposes the new version:

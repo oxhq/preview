@@ -1,0 +1,27 @@
+# Keep GitHub-generated source archives focused on runtime/package files.
+
+# Repository automation and local VCS metadata.
+/.github export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+
+# Internal preview, local fixtures, and agent-only surfaces.
+/.preview-internal export-ignore
+/.agents export-ignore
+/.claude export-ignore
+/.codex export-ignore
+/AGENTS.md export-ignore
+/CLAUDE.md export-ignore
+/GEMINI.md export-ignore
+
+# Test suites, PHPUnit configuration, and local PHPUnit caches.
+/tests export-ignore
+/phpunit.xml export-ignore
+/.phpunit.cache export-ignore
+/.phpunit.result.cache export-ignore
+
+# Local/runtime-generated content and dependency installs.
+/vendor export-ignore
+/storage export-ignore
+/fixtures export-ignore
+/local-fixtures export-ignore
