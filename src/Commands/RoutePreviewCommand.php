@@ -16,7 +16,11 @@ final class RoutePreviewCommand extends Command
         {--param=* : Route parameter as "name=value"; may be repeated}
         {--readonly-db : Mark the link with database-readonly intent and print safety warnings}
         {--guard= : Guard/session context label to record on the preview link}
-        {--allow-write : Explicitly allow non-GET/HEAD routes}';
+        {--allow-write : Explicitly allow non-GET/HEAD routes}
+        {--fake-queue : Fake queued jobs during proxied execution where Laravel bindings are available}
+        {--fake-mail : Fake mail during proxied execution where Laravel bindings are available}
+        {--fake-http : Fake outbound HTTP during proxied execution where Laravel bindings are available}
+        {--fake-events : Fake events during proxied execution where Laravel bindings are available}';
 
     protected $description = 'Create a signed, time-limited preview link for a named Laravel route.';
 
@@ -36,6 +40,7 @@ final class RoutePreviewCommand extends Command
                 readonlyDb: (bool) $this->option('readonly-db'),
                 guard: is_string($this->option('guard')) ? (string) $this->option('guard') : null,
                 allowWrite: (bool) $this->option('allow-write'),
+                fakes: $this->fakes(),
             );
         } catch (RuntimeException $exception) {
             $this->error(str_replace('Pass allowWrite=true', 'Pass --allow-write', $exception->getMessage()));
@@ -46,6 +51,7 @@ final class RoutePreviewCommand extends Command
         $this->line("Route: {$preview->name}");
         $this->line("URI: {$preview->uri}");
         $this->line('Methods: '.implode(', ', $preview->methods));
+        $this->line("Execution method: {$preview->executionMethod}");
         $this->line('Middleware: '.($preview->middleware === [] ? 'none' : implode(', ', $preview->middleware)));
         $this->line("Action: {$preview->action}");
 
@@ -59,6 +65,10 @@ final class RoutePreviewCommand extends Command
 
         if ($preview->guard !== null) {
             $this->line("Guard: {$preview->guard}");
+        }
+
+        if ($preview->fakes !== []) {
+            $this->line('Fakes: '.implode(', ', $preview->fakes));
         }
 
         $this->line('Readonly DB: '.($preview->readonlyDb ? 'requested' : 'not requested'));
@@ -120,6 +130,22 @@ final class RoutePreviewCommand extends Command
         }
 
         return implode(', ', $formatted);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fakes(): array
+    {
+        $fakes = [];
+
+        foreach (['queue', 'mail', 'http', 'events'] as $fake) {
+            if ((bool) $this->option('fake-'.$fake)) {
+                $fakes[] = $fake;
+            }
+        }
+
+        return $fakes;
     }
 
     /**

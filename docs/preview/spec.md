@@ -373,7 +373,7 @@ Trust is part of the product. "Local-first" must be enforced by behavior, not on
 
 `Preview\Route` starts in v0.3 as Safe Route Preview. It is not part of v0.1 or v0.2.
 
-The first implementation slice is route-link generation, not full proxy execution:
+The route preview command generates signed, time-limited access to a named Laravel route:
 
 ```bash
 php artisan preview:route {route} --ttl=2h --param=id=123 --readonly-db --guard=client
@@ -387,22 +387,26 @@ php artisan preview:route billing.portal --ttl=2h --param=id=123 --readonly-db -
 
 Use `--readonly-db`, not `--readonly`.
 
-First slice scope:
+v0.3 route preview scope:
 
 - named route lookup
 - middleware summary
 - TTL signed access links
 - route parameters from repeated `--param=key=value` flags
-- optional guard context summary through `--guard`
+- required, optional, and domain parameter validation
+- guard context recorded as request metadata through `--guard`
 - default blocking for routes that do not allow `GET` or `HEAD`
-- explicit opt-in before non-`GET`/`HEAD` routes can be exposed in later work
-- `--readonly-db` accepted as a declared safety flag with warnings
+- explicit opt-in before non-`GET`/`HEAD` routes can be exposed
+- proxied execution of the named route through the signed preview link
+- `--readonly-db` transaction rollback for covered database writes inside the wrapped request
+- side-effect fake flags for supported queue, mail, HTTP, and event behavior
+- expiry, signature, parameter, warning, and audit-output tests
 
-`--readonly-db` does not mean the route is fully readonly. In this first slice it records and displays the operator's intended safety posture, then warns about the limits. Full request transaction rollback, proxied execution, and side-effect fakes are later v0.3 follow-ups.
+`--readonly-db` is not a complete read-only guarantee. It only covers database writes performed inside the wrapped preview request transaction.
 
-Database transaction rollback does not protect queues, mail, cache, filesystem writes, external HTTP calls, or events.
+Database transaction rollback does not protect queues, mail, cache, filesystem writes, external HTTP calls, or events unless the specific side effect is covered by an explicit fake flag.
 
-Future safety flags:
+Safety flags:
 
 ```bash
 --fake-queue

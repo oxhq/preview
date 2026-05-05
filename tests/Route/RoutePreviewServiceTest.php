@@ -69,7 +69,7 @@ final class RoutePreviewServiceTest extends TestCase
         $this->assertSame('2026-05-03 14:00:00', $preview->expiresAt->format('Y-m-d H:i:s'));
     }
 
-    public function test_signed_preview_url_redirects_to_the_named_route_with_parameters(): void
+    public function test_signed_preview_url_executes_the_named_route_with_parameters(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-03 12:00:00', 'UTC'));
 
@@ -83,7 +83,8 @@ final class RoutePreviewServiceTest extends TestCase
         );
 
         $this->get($preview->url)
-            ->assertRedirect(route('preview.accounts.dashboard', ['account' => 'acme']));
+            ->assertOk()
+            ->assertSee('acme');
     }
 
     public function test_it_rejects_missing_named_routes(): void

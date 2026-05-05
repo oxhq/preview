@@ -71,33 +71,39 @@ Exit criteria:
 
 Goal: expose Laravel routes with Laravel-aware safety and context.
 
-First implementation slice CLI target:
+CLI target:
 
 ```bash
 php artisan preview:route {route} --ttl=2h --param=id=123 --readonly-db --guard=client
 ```
 
-First slice ships:
+v0.3 now splits into two parallel route-preview slices.
+
+Slice A: signed proxy execution and safety controls:
 
 - named route lookup
 - middleware summary
 - TTL signed access links
 - route params through repeated `--param=key=value`
-- optional guard context summary
+- guard context carried as request metadata
 - default blocking of routes that do not allow `GET` or `HEAD`
-- `--readonly-db` as a declared safety flag with warnings
+- explicit non-read method opt-in
+- proxy execution of the named route through the signed preview link
+- `--readonly-db` transaction wrapper for covered database writes
+- side-effect fake flags for supported queue, mail, HTTP, and event behavior
 
-Do not call it `--readonly`. `--readonly-db` is not full readonly: database rollback does not protect queues, mail, cache, filesystem writes, external HTTP calls, or events.
+Slice B: parameter, signature, warning, and audit hardening:
 
-Later v0.3 follow-ups:
+- required parameter failures
+- optional parameter handling
+- domain parameter handling
+- expiry and signature tests
+- clearer warnings for uncovered side effects and unsafe methods
+- audit output for route, method, params, guard metadata, TTL, safety flags, and execution mode
 
-- proxied request execution through signed access links
-- full request transaction rollback for covered database writes
-- explicit opt-in for exposing non-`GET`/`HEAD` routes
-- guard/session impersonation behavior beyond summary output
-- richer side-effect fakes
+Do not call it `--readonly`. `--readonly-db` is not a complete read-only guarantee: it only covers database writes inside the wrapped preview request. It does not cover queues, mail, cache, filesystem writes, external HTTP calls, or events unless explicit fake flags are used for the side effects the package supports.
 
-Future safety flags:
+Safety flags:
 
 ```bash
 --fake-queue

@@ -28,6 +28,7 @@ final class RoutePreviewService
         bool $readonlyDb = false,
         ?string $guard = null,
         bool $allowWrite = false,
+        array $fakes = [],
     ): RoutePreview {
         $route = $this->router->getRoutes()->getByName($routeName);
 
@@ -50,10 +51,17 @@ final class RoutePreviewService
 
         $expiresAt = $this->expiresAt($ttl);
         $middleware = array_values(array_map('strval', $route->gatherMiddleware()));
+        $executionMethod = $this->executionMethod($methods, $allowWrite);
+        $fakes = $this->normalizeFakes($fakes);
         $query = [
             'route' => $routeName,
             '_preview_params' => $this->encodeParameters($parameters),
+            '_preview_method' => $executionMethod,
         ];
+
+        if ($allowWrite) {
+            $query['_preview_allow_write'] = '1';
+        }
 
         if ($readonlyDb) {
             $query['_preview_readonly_db'] = '1';
@@ -61,6 +69,10 @@ final class RoutePreviewService
 
         if ($guard !== null && trim($guard) !== '') {
             $query['_preview_guard'] = trim($guard);
+        }
+
+        if ($fakes !== []) {
+            $query['_preview_fakes'] = implode(',', $fakes);
         }
 
         $warnings = [];
@@ -80,6 +92,10 @@ final class RoutePreviewService
             $warnings[] = sprintf('Guard [%s] is recorded on the preview link; it does not bypass application authorization.', trim($guard));
         }
 
+        foreach ($fakes as $fake) {
+            $warnings[] = "Preview will request fake [{$fake}] during proxied execution.";
+        }
+
         return new RoutePreview(
             name: $routeName,
             uri: $route->uri(),
@@ -87,13 +103,31 @@ final class RoutePreviewService
             domain: $route->getDomain(),
             methods: $methods,
             middleware: $middleware,
+            executionMethod: $executionMethod,
             url: $this->url->temporarySignedRoute('preview.route.access', $expiresAt, $query),
             expiresAt: $expiresAt,
             parameters: $parameters,
             readonlyDb: $readonlyDb,
             guard: $guard !== null && trim($guard) !== '' ? trim($guard) : null,
+            fakes: $fakes,
             warnings: $warnings,
         );
+    }
+
+    /**
+     * @param list<string> $methods
+     */
+    private function executionMethod(array $methods, bool $allowWrite): string
+    {
+        if (in_array('GET', $methods, true)) {
+            return 'GET';
+        }
+
+        if (in_array('HEAD', $methods, true)) {
+            return 'HEAD';
+        }
+
+        return $allowWrite ? $methods[0] : 'GET';
     }
 
     /**
@@ -124,6 +158,30 @@ final class RoutePreviewService
         preg_match_all('/\{([^?}]+)\}/', $value, $matches);
 
         return array_values(array_filter(array_map('strval', $matches[1] ?? [])));
+    }
+
+    /**
+     * @param array<int, string|mixed> $fakes
+     * @return list<string>
+     */
+    private function normalizeFakes(array $fakes): array
+    {
+        $allowed = ['queue', 'mail', 'http', 'events'];
+        $normalized = [];
+
+        foreach ($fakes as $fake) {
+            if (! is_string($fake)) {
+                continue;
+            }
+
+            $fake = strtolower(trim($fake));
+
+            if (in_array($fake, $allowed, true)) {
+                $normalized[] = $fake;
+            }
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     private function expiresAt(string $ttl): DateTimeImmutable
