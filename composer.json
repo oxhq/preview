@@ -1,8 +1,30 @@
 {
     "name": "oxhq/preview",
     "description": "Laravel-native capture, replay, fixture, and test generation for real application flows.",
+    "homepage": "https://github.com/oxhq/preview",
     "type": "library",
     "license": "MIT",
+    "keywords": [
+        "capture",
+        "flow-replay",
+        "fixtures",
+        "laravel",
+        "preview",
+        "replay",
+        "testing"
+    ],
+    "authors": [
+        {
+            "name": "oxhq",
+            "homepage": "https://github.com/oxhq",
+            "role": "Maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/oxhq/preview/issues",
+        "source": "https://github.com/oxhq/preview",
+        "docs": "https://github.com/oxhq/preview#readme"
+    },
     "require": {
         "php": "^8.3",
         "illuminate/console": "^11.0|^12.0",
@@ -32,14 +54,26 @@
             ]
         }
     },
+    "archive": {
+        "exclude": [
+            "/.github",
+            "/.phpunit.result.cache",
+            "/.preview-internal",
+            "/phpunit.xml",
+            "/tests"
+        ]
+    },
     "scripts": {
         "ci": [
             "composer validate --strict",
             "php scripts/check-release-surface.php",
             "phpunit"
         ],
+        "release:github": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-github-release.ps1",
+        "release:packagist": "php scripts/check-packagist.php",
         "release:check": "php scripts/check-release-surface.php",
         "smoke:consumer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-consumer.ps1",
+        "smoke:packagist-install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-packagist-install.ps1",
         "smoke:stripe-cli": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-stripe-cli.ps1",
         "smoke:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-tunnel.ps1",
         "test": "phpunit"

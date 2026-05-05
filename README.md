@@ -343,6 +343,8 @@ Run local verification:
 ```bash
 composer ci
 composer release:check
+composer release:github -- -Version v0.1.0
+composer release:packagist -- v0.1.0
 composer test
 ```
 
@@ -350,6 +352,7 @@ Release and integration proof helpers:
 
 ```powershell
 composer smoke:consumer
+composer smoke:packagist-install -- -Version v0.1.0
 composer smoke:tunnel
 $env:PREVIEW_STRIPE_ENDPOINT_SECRET = 'whsec_...'
 composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed
@@ -359,6 +362,8 @@ composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed
 through a Composer path repository, captures a generic request, generates a fixture and
 Pest test, runs the generated test, and deletes the disposable app unless the script is
 called with `-KeepWorkDir`.
+`composer smoke:packagist-install` performs the same basic capture/fixture/test smoke
+from the package visible on Packagist after a release.
 `composer smoke:tunnel` proves local tunnel startup and capture URL extraction only; it
 does not prove webhook delivery.
 `composer smoke:stripe-cli` is the real Stripe CLI proof path and requires Stripe CLI auth

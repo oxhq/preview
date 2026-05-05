@@ -29,9 +29,13 @@ if (is_file($composerPath)) {
 
     $check(json_last_error() === JSON_ERROR_NONE && is_array($composer), 'composer.json is valid JSON');
     $check(($composer['name'] ?? null) === 'oxhq/preview', 'composer.json package name is oxhq/preview');
+    $check(($composer['homepage'] ?? null) === 'https://github.com/oxhq/preview', 'composer.json homepage points to GitHub repository');
+    $check(($composer['support']['docs'] ?? null) === 'https://github.com/oxhq/preview#readme', 'composer.json docs support points to README');
 } else {
     $check(false, 'composer.json is valid JSON');
     $check(false, 'composer.json package name is oxhq/preview');
+    $check(false, 'composer.json homepage points to GitHub repository');
+    $check(false, 'composer.json docs support points to README');
 }
 
 $check(is_file($path('README.md')), 'README.md exists');
@@ -39,6 +43,9 @@ $check(is_file($path('CHANGELOG.md')), 'CHANGELOG.md exists');
 $check(is_file($path('RELEASE.md')), 'RELEASE.md exists');
 $check(is_file($path('.github/workflows/ci.yml')), '.github/workflows/ci.yml exists');
 $check(is_file($path('.github/workflows/release.yml')), '.github/workflows/release.yml exists');
+$check(is_file($path('scripts/check-github-release.ps1')), 'scripts/check-github-release.ps1 exists');
+$check(is_file($path('scripts/check-packagist.php')), 'scripts/check-packagist.php exists');
+$check(is_file($path('scripts/smoke-packagist-install.ps1')), 'scripts/smoke-packagist-install.ps1 exists');
 
 $readmePath = $path('README.md');
 if (is_file($readmePath)) {

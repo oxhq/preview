@@ -26,10 +26,14 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
 
 - Tag the release from the verified commit.
 - Push the tag to GitHub.
-- Confirm Packagist sees `oxhq/preview` and exposes the new version.
+- Confirm the GitHub Release and tag state:
+  - `composer release:github -- -Version v0.1.0`
+- Confirm Packagist sees `oxhq/preview` and exposes the new version:
+  - `composer release:packagist -- v0.1.0`
 
 ## Post-Release Verification
 
-- Install the tagged version in a clean consumer Laravel app with `composer require --dev oxhq/preview:<version>`.
+- Install the tagged version in a clean consumer Laravel app from Packagist:
+  - `composer smoke:packagist-install -- -Version v0.1.0`
 - Run `php artisan preview:doctor` and one capture or route-preview smoke from that clean install.
 - Confirm the README, changelog, release notes, and Packagist metadata describe only proven behavior.
