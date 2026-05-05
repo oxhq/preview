@@ -69,6 +69,7 @@
         "ci": [
             "composer validate --strict",
             "php scripts/check-release-surface.php",
+            "php scripts/check-command-surface.php",
             "phpunit"
         ],
         "release:dist": "php scripts/check-dist-archive.php",
@@ -76,6 +77,7 @@
         "release:packagist": "php scripts/check-packagist.php",
         "release:prepare": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-release.ps1",
         "release:check": "php scripts/check-release-surface.php",
+        "release:commands": "php scripts/check-command-surface.php",
         "release:source": "php scripts/check-source-archive.php",
         "smoke:consumer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-consumer.ps1",
         "smoke:packagist-install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-packagist-install.ps1",

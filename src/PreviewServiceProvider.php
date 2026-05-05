@@ -7,6 +7,7 @@ namespace Oxhq\Preview;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Oxhq\Preview\Commands\CaptureCommand;
+use Oxhq\Preview\Commands\CaptureCompareCommand;
 use Oxhq\Preview\Commands\CaptureDoctorCommand;
 use Oxhq\Preview\Commands\CaptureExportCommand;
 use Oxhq\Preview\Commands\CaptureFixtureCommand;
@@ -17,6 +18,7 @@ use Oxhq\Preview\Commands\CaptureReplayCommand;
 use Oxhq\Preview\Commands\CaptureShowCommand;
 use Oxhq\Preview\Commands\CaptureStatsCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
+use Oxhq\Preview\Commands\CaptureTimelineCommand;
 use Oxhq\Preview\Commands\CaptureVerifyCommand;
 use Oxhq\Preview\Commands\ConfigShowCommand;
 use Oxhq\Preview\Commands\FixtureDoctorCommand;
@@ -26,7 +28,9 @@ use Oxhq\Preview\Commands\PreviewDoctorCommand;
 use Oxhq\Preview\Commands\ProviderDoctorCommand;
 use Oxhq\Preview\Commands\ProviderListCommand;
 use Oxhq\Preview\Commands\ProviderSampleCommand;
+use Oxhq\Preview\Commands\ProviderSelfTestCommand;
 use Oxhq\Preview\Commands\RouteDoctorCommand;
+use Oxhq\Preview\Commands\RouteExportCommand;
 use Oxhq\Preview\Commands\RouteListCommand;
 use Oxhq\Preview\Commands\RoutePreviewCommand;
 use Oxhq\Preview\Commands\ScenarioExportCommand;
@@ -204,6 +208,7 @@ class PreviewServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 CaptureCommand::class,
+                CaptureCompareCommand::class,
                 CaptureDoctorCommand::class,
                 CaptureExportCommand::class,
                 CaptureFixtureCommand::class,
@@ -214,6 +219,7 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureShowCommand::class,
                 CaptureStatsCommand::class,
                 CaptureTestCommand::class,
+                CaptureTimelineCommand::class,
                 CaptureVerifyCommand::class,
                 ConfigShowCommand::class,
                 FixtureDoctorCommand::class,
@@ -223,7 +229,9 @@ class PreviewServiceProvider extends ServiceProvider
                 ProviderDoctorCommand::class,
                 ProviderListCommand::class,
                 ProviderSampleCommand::class,
+                ProviderSelfTestCommand::class,
                 RouteDoctorCommand::class,
+                RouteExportCommand::class,
                 RouteListCommand::class,
                 RoutePreviewCommand::class,
                 ScenarioExportCommand::class,

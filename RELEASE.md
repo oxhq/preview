@@ -6,6 +6,7 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
 
 - Run local package checks from the repository root:
   - `composer ci`
+  - `composer release:commands`
   - `composer release:dist`
 - After the release candidate is committed, confirm the GitHub source archive surface:
   - `composer release:source`

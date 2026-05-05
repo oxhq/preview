@@ -78,12 +78,16 @@ php artisan preview:provider:doctor
 php artisan preview:provider:doctor --json
 php artisan preview:provider:sample stripe --event=checkout.session.completed
 php artisan preview:provider:sample hmac --event=order.created --json
+php artisan preview:provider:self-test
+php artisan preview:provider:self-test stripe --json
 ```
 
 `preview:provider:doctor` reports provider capabilities and whether built-in provider
 secrets still use placeholder values. It does not print secret values.
 `preview:provider:sample` prints synthetic provider-shaped request data for local capture
 and fixture checks. It does not use or print live provider payloads.
+`preview:provider:self-test` signs and verifies synthetic in-memory provider requests
+without printing provider secrets.
 
 ## Capture
 
@@ -121,10 +125,14 @@ php artisan preview:capture:doctor --capture={capture}
 php artisan preview:capture:doctor --json
 php artisan preview:capture:stats
 php artisan preview:capture:stats --json
+php artisan preview:capture:timeline
+php artisan preview:capture:timeline --provider=stripe --json
 php artisan preview:capture:verify {capture}
 php artisan preview:capture:verify {capture} --json
 php artisan preview:capture:integrity {capture}
 php artisan preview:capture:integrity {capture} --json
+php artisan preview:capture:compare {capture} {other-capture}
+php artisan preview:capture:compare {capture} {other-capture} --json
 php artisan preview:capture:export {capture}
 php artisan preview:capture:export {capture} --path=storage/preview/exports --json
 php artisan preview:capture:replay {capture} --exact
@@ -147,8 +155,12 @@ secret header values.
 raw headers, so redacted metadata cannot accidentally change the verification result.
 `preview:capture:integrity` reports raw file readability, byte counts, and SHA-256 hashes
 without printing payloads or raw headers.
+`preview:capture:compare` compares two captures by metadata, header keys, and file hashes
+without printing payloads or header values.
 `preview:capture:stats` summarizes the local capture inventory by provider, event type,
 verification state, and capture time range.
+`preview:capture:timeline` prints a chronological capture summary with byte counts and
+safe metadata only.
 `preview:capture:export` writes a redacted metadata-only export. It does not copy raw
 payloads, raw headers, or local secret-bearing files.
 Capture pruning requires an explicit date cutoff and only deletes directories resolved
@@ -197,6 +209,8 @@ php artisan preview:route:list
 php artisan preview:route:list --filter=billing --json
 php artisan preview:route:doctor
 php artisan preview:route:doctor --json
+php artisan preview:route:export
+php artisan preview:route:export billing.portal --path=storage/preview/exports/routes --json
 
 php artisan preview:route billing.portal \
   --ttl=2h \
@@ -217,6 +231,8 @@ creating signed links or executing route actions.
 `preview:route:doctor` reports route-preview readiness, configured path, named route
 counts, write-route warnings, supported fakes, and signing prerequisites without
 executing routes.
+`preview:route:export` writes safe named-route metadata to JSON without executing route
+actions.
 
 Safety boundaries are explicit:
 
@@ -359,6 +375,7 @@ Run local verification:
 ```bash
 composer ci
 composer release:check
+composer release:commands
 composer release:dist
 composer release:source
 composer release:prepare -- -Version v0.1.0
