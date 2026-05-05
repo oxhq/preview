@@ -1,43 +1,22 @@
 # Laravel Preview
 
-Laravel Preview is a local-first Laravel package for turning real inbound application traffic into replayable captures, fixtures, and generated Pest-style tests.
+Laravel Preview is a local-first Laravel package for reproducing real application flows.
+It captures inbound traffic, verifies provider context, replays requests, writes fixtures,
+generates Pest-compatible tests, previews named routes safely, and composes those pieces
+into reusable local scenarios.
 
-It is not a tunnel product or a hosted request bin. Tunnels get traffic to your machine; Laravel Preview starts once that traffic reaches Laravel and makes the flow reproducible.
+It is not a tunnel product, a hosted request bin, or a Stripe-only webhook debugger.
+Tunnels get traffic to your machine. Laravel Preview starts once traffic reaches Laravel
+and turns that flow into local development assets.
 
-## What It Does
-
-- Captures inbound requests through `/__preview/capture/{provider}`.
-- Preserves raw request bodies and raw headers for exact replay.
-- Stores redacted capture metadata locally by default.
-- Verifies and re-signs provider traffic through provider adapters.
-- Generates fixture files and Pest-compatible test files from captures.
-- Supports safe route preview for signed, time-limited route links with explicit safety controls.
-
-## Supported Providers
-
-| Provider | Signature verification | Re-sign replay | Event extraction |
-| --- | --- | --- | --- |
-| Generic | No | No | `X-Preview-Event` |
-| Generic HMAC | Yes | Yes | `X-Preview-Event` |
-| Stripe | Yes | Yes | payload `type` |
-| GitHub | Yes | Yes | `X-GitHub-Event` |
-| Shopify | Yes | Yes | `X-Shopify-Topic` |
-
-Candidate providers in `docs/preview/provider-capability-matrix.md` are not supported until they have implementation and tests.
-
-## Installation
+## Install
 
 ```bash
 composer require --dev oxhq/preview
-```
-
-Publish the config when you need to change storage, provider secrets, transport binaries, or capture-route settings:
-
-```bash
 php artisan vendor:publish --tag=preview-config
 ```
 
-For local development before the package is published, require it through a Composer path repository from a Laravel app:
+Before the package is published, install it from a Laravel app through a Composer path repository:
 
 ```json
 {
@@ -56,6 +35,31 @@ For local development before the package is published, require it through a Comp
 }
 ```
 
+## What Ships
+
+- Local HTTP capture through `/__preview/capture/{provider}`.
+- Synthetic capture through Artisan for repeatable local checks.
+- Exact replay with captured raw body and headers.
+- Provider-aware re-sign replay for providers that support signing.
+- Fixture generation and Pest-compatible capture tests.
+- Signed route preview for named Laravel routes.
+- Local scenario files that compose seeds, captures, route previews, fakes, and notes.
+- Scenario replay and Pest-compatible scenario test generation.
+
+## Providers
+
+| Provider | Verifies signatures | Re-signs replay | Event source |
+| --- | --- | --- | --- |
+| Generic | No | No | `X-Preview-Event` |
+| Generic HMAC | Yes | Yes | `X-Preview-Event` |
+| Stripe | Yes | Yes | payload `type` |
+| GitHub | Yes | Yes | `X-GitHub-Event` |
+| Shopify | Yes | Yes | `X-Shopify-Topic` |
+
+Stripe is a high-fidelity reference provider, not the product center. Provider-specific
+logic belongs inside provider adapters, not in the capture, replay, fixture, or test
+generation services.
+
 ## Capture
 
 Synthetic local capture:
@@ -67,7 +71,7 @@ php artisan preview:capture generic \
   --body='{"id":1}'
 ```
 
-Live tunnel capture requires both config and CLI opt-in:
+Live tunnel capture requires explicit config and CLI opt-in:
 
 ```bash
 PREVIEW_LIVE_ENABLED=true php artisan preview:capture generic \
@@ -77,11 +81,12 @@ PREVIEW_LIVE_ENABLED=true php artisan preview:capture generic \
   --hold-seconds=60
 ```
 
-Capture storage is local-first. Raw captures and local-only fixture payloads are gitignored by default.
-
-## Replay And Generate
+Capture commands:
 
 ```bash
+php artisan preview:capture generic
+php artisan preview:capture hmac --signature-header=X-Signature
+php artisan preview:capture stripe
 php artisan preview:capture:list
 php artisan preview:capture:show {capture}
 php artisan preview:capture:replay {capture} --exact
@@ -90,9 +95,13 @@ php artisan preview:capture:fixture {capture}
 php artisan preview:capture:test {capture}
 ```
 
-`--exact` replays captured raw headers and raw body. `--resign` asks the provider adapter to generate fresh valid signature headers when supported.
+Raw captures stay local. Metadata and generated fixtures redact configured sensitive
+headers such as cookies and authorization values.
 
 ## Route Preview
+
+Route preview creates signed, time-limited links for named Laravel routes and proxies
+execution through Laravel Preview's signed route endpoint.
 
 ```bash
 php artisan preview:route billing.portal \
@@ -100,22 +109,28 @@ php artisan preview:route billing.portal \
   --param=id=123 \
   --session=currency=usd \
   --readonly-db \
-  --guard=client \
+  --guard=web \
+  --user-id=42 \
+  --user-model="App\Models\User" \
   --fake-queue \
-  --fake-mail
+  --fake-mail \
+  --fake-http \
+  --fake-events
 ```
 
-Route preview creates signed, time-limited links for named Laravel routes and proxies execution through the signed preview endpoint. Explicit opt-in is required before non-read methods are exposed.
+Safety boundaries are explicit:
 
-`--readonly-db` wraps the covered request in a database transaction so database writes can be rolled back. It is not a complete read-only guarantee: queues, mail, cache, filesystem writes, external HTTP, and events are outside that database wrapper unless explicit fake flags are used for the side effects the package supports.
+- `--readonly-db` wraps the covered preview request in a database transaction. It is not full read-only mode.
+- `--guard` selects or records guard context. It does not authenticate a user by itself.
+- `--user-id` plus optional `--user-model` resolves an app-specific authenticatable user for the proxied request.
+- fake flags cover the supported Laravel queue, mail, HTTP, and event facades only.
+- route preview does not isolate cache, filesystem writes, arbitrary external services, policies, or authorization logic.
+- non-read routes are blocked unless the command explicitly opts into write-method preview.
 
-Repeated `--session=key=value` flags carry session context into the proxied preview request. `--user-id` plus optional `--user-model` can attach an app-specific authenticated user context for the proxied request. `--guard` selects the guard for that explicit user context and remains audit metadata; by itself it does not authenticate a user, isolate the filesystem, or isolate cache.
+## Scenarios
 
-Route preview now behavior-tests the supported queue, mail, HTTP, and event fakes. The auth context is not a generic authorization bypass, policy bypass, or complete isolation boundary.
-
-## Scenario Workbench
-
-The first v1.0 Scenario foundation slice keeps scenarios local to the Laravel app. A scenario is a PHP file under `preview/scenarios` by default, or the path configured by `PREVIEW_SCENARIO_PATH`, that returns an `Oxhq\Preview\Scenario\Scenario` instance.
+A scenario is a local PHP file under `preview/scenarios` by default, or the configured
+`preview.scenario_path`, that returns `Oxhq\Preview\Scenario\Scenario`.
 
 ```php
 use App\Database\Seeders\DemoSubscriptionSeeder;
@@ -128,35 +143,71 @@ return new Scenario(
     routeParameters: [
         'billing.portal' => ['id' => '123'],
     ],
+    routeContext: [
+        'billing.portal' => [
+            'session' => ['tenant' => 'acme'],
+            'guard' => 'web',
+            'user_id' => '42',
+            'user_model' => App\Models\User::class,
+            'readonly_db' => true,
+            'fakes' => ['mail'],
+        ],
+    ],
     captures: ['20260505011852323-sugxujb2'],
-    fakes: ['queue', 'mail'],
-    notes: 'Exercises the local renewal review flow after a captured provider callback.',
+    fakes: ['queue', 'events'],
+    notes: 'Exercises renewal review after a provider callback.',
 );
 ```
 
-Scenario files record capture IDs, route names, optional route parameters, fake boundaries, an optional seed class, and optional notes. The discovery commands are intentionally read-only:
+Scenario commands:
 
 ```bash
+php artisan preview:scenario:make subscription-renewal \
+  --seed="App\Database\Seeders\DemoSubscriptionSeeder" \
+  --capture=20260505011852323-sugxujb2 \
+  --route=billing.portal \
+  --param=billing.portal:id=123 \
+  --route-session=billing.portal:tenant=acme \
+  --route-guard=billing.portal=web \
+  --route-user="billing.portal:42:App\Models\User" \
+  --route-readonly-db=billing.portal \
+  --route-fake=billing.portal:mail
+
 php artisan preview:scenario:list
 php artisan preview:scenario:show subscription-renewal
-```
-
-Scenario replay now runs the configured seeder before replay through Laravel's normal seeder path and composes each listed capture through the existing replay engine:
-
-```bash
 php artisan preview:scenario:replay subscription-renewal --exact
 php artisan preview:scenario:replay subscription-renewal --resign
+php artisan preview:scenario:test subscription-renewal
 ```
 
-`--exact` replays each scenario capture with the stored raw body and captured headers. `--resign` replays each scenario capture with the stored raw body plus fresh provider-valid signature headers when the provider supports signing. Scenario replay fails clearly when a capture cannot be found, a provider cannot re-sign, or a configured seeder fails.
+Scenario replay runs the configured seeder through Laravel's normal seeder path, replays
+listed captures, dispatches captures when `--send-to` is provided, and executes listed
+routes through the same signed route-preview safety layer. Replay prints a summary of
+seed, capture, dispatch, and route counts, and failures include the failing dispatch or
+route when a partial result exists. Scenario fakes are forwarded to route preview; they do
+not provide broader isolation than the route-preview fake flags.
 
-Scenario route composition is package-local behavior only when named route previews execute through `preview:scenario:replay` under the same route-preview safety limits. Scenario fakes such as `queue`, `mail`, `http`, and `events` are fake requests to the route-preview layer; they do not create complete side-effect isolation for cache, filesystem, external services outside Laravel's fake boundary, authorization policy bypass, or hosted sharing.
+Generated scenario tests are Pest-compatible and local-first. They are meant to fail
+clearly when the host app lacks required routes, models, provider secrets, seed data, or
+database state. Generated scenario tests call `ScenarioRunner` directly and assert the
+replay result object instead of only checking command text.
 
-Scenario Pest test generation now writes Pest-compatible scenario test files from local scenario files. Package tests prove the generated file content and command behavior; they do not prove a fresh consumer app running those Pest files. Captures, route preview, fixtures, generated capture-level Pest tests, and the package-internal Scenario replay slices are the proven local surfaces today.
+## Proof Boundary
 
-## Current Proof Boundary
+Current proof in this repository is package-local Testbench proof plus a recorded Laravel
+12 Composer path-repository smoke for package discovery and synthetic generic capture.
+The package test suite covers capture, replay, fixture generation, provider contracts,
+route preview, scenario replay, route composition, fake propagation, and generated test
+syntax/structure.
 
-This repository has package-internal Testbench coverage for capture, replay, fixture generation, provider contracts, route preview, and the implemented Scenario slices. It also has a recorded Laravel 12 path-repository consumer smoke for package discovery and synthetic capture. Package tests may prove local package behavior; they do not prove Packagist publication, hosted CI, SaaS behavior, live tunnel startup with real cloudflared/ngrok binaries, or a fresh consumer app running every Scenario workflow.
+This does not prove:
+
+- Packagist installation.
+- hosted CI.
+- SaaS, managed relay, persistent URLs, team sharing, or audit logs.
+- live startup with real cloudflared or ngrok binaries.
+- real production provider traffic.
+- every generated scenario test running inside a fresh consumer app with Pest installed.
 
 Run local verification:
 
@@ -164,13 +215,6 @@ Run local verification:
 composer validate --strict
 composer test
 ```
-
-## Documentation
-
-- `docs/preview/spec.md` defines the product boundary and long-term architecture.
-- `docs/preview/plans/v0.1-capture-to-test.md` tracks the capture-to-test implementation plan.
-- `docs/preview/provider-capability-matrix.md` lists supported and candidate provider status.
-- `docs/preview/provider-contribution-guide.md` explains how to add a provider without special-casing core services.
 
 ## License
 

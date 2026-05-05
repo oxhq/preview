@@ -41,10 +41,11 @@ final class ScenarioListCommand extends Command
 
         foreach ($scenarios as $scenario) {
             $this->line(sprintf(
-                ' - %s (captures: %d, routes: %d, fakes: %d)',
+                ' - %s (captures: %d, routes: %d, route-contexts: %d, fakes: %d)',
                 $scenario->name,
                 count($scenario->captures),
                 count($scenario->routes),
+                count(array_filter($scenario->routeContext)),
                 count($scenario->fakes),
             ));
         }

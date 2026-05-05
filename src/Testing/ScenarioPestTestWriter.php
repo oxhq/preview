@@ -26,6 +26,7 @@ final class ScenarioPestTestWriter
     private function testPhp(Scenario $scenario): string
     {
         $php = "<?php\n\n"
+            ."use Oxhq\\Preview\\Scenario\\ScenarioRunner;\n\n"
             .'it('.$this->exportString("replays {$scenario->name} preview scenario").", function () {\n";
 
         if ($scenario->seed !== null) {
@@ -51,33 +52,36 @@ final class ScenarioPestTestWriter
         }
 
         $php .= "\n"
-            ."    \$this->artisan('preview:scenario:replay', [\n"
-            ."        'scenario' => ".$this->exportString($scenario->name).",\n"
-            ."        '--exact' => true,\n"
-            ."    ])\n";
+            ."    \$result = app(ScenarioRunner::class)->replay(".$this->exportString($scenario->name).", 'exact');\n\n"
+            ."    \$this->assertSame(".$this->exportString($scenario->name).", \$result->scenario->name);\n"
+            ."    \$this->assertSame('exact', \$result->mode);\n";
 
         if ($scenario->seed !== null) {
-            $php .= "        ->expectsOutputToContain(".$this->exportString("Seed: {$scenario->seed}").")\n";
-        }
-
-        if ($scenario->captures === []) {
-            $php .= "        ->expectsOutputToContain('Captures: none')\n";
+            $php .= "    \$this->assertSame(".$this->exportString($scenario->seed).", \$result->seed);\n";
         } else {
-            foreach ($scenario->captures as $capture) {
-                $php .= "        ->expectsOutputToContain(".$this->exportString("Capture: {$capture}").")\n";
-            }
+            $php .= "    \$this->assertNull(\$result->seed);\n";
         }
 
-        if ($scenario->routes === []) {
-            $php .= "        ->expectsOutputToContain('Routes: none')\n";
-        } else {
-            foreach ($scenario->routes as $route) {
-                $php .= "        ->expectsOutputToContain(".$this->exportString("Route: {$route} HTTP ").")\n";
-            }
+        $php .= "    \$this->assertCount(".count($scenario->captures).", \$result->captures);\n";
+
+        foreach ($scenario->captures as $index => $capture) {
+            $php .= "    \$this->assertSame(".$this->exportString($capture).", \$result->captures[{$index}]['id'] ?? null);\n";
         }
 
-        $php .= "        ->assertExitCode(0);\n"
-            ."});\n";
+        if ($scenario->captures !== []) {
+            $php .= "    \$this->assertCount(".count($scenario->captures).", \$result->dispatches);\n";
+        }
+
+        $php .= "    \$this->assertCount(".count($scenario->routes).", \$result->routes);\n";
+
+        foreach ($scenario->routes as $index => $route) {
+            $php .= "    \$this->assertSame(".$this->exportString($route).", \$result->routes[{$index}]->preview->name);\n"
+                ."    \$this->assertTrue(\$result->routes[{$index}]->successful());\n"
+                ."    \$this->assertGreaterThanOrEqual(200, \$result->routes[{$index}]->response->getStatusCode());\n"
+                ."    \$this->assertLessThan(300, \$result->routes[{$index}]->response->getStatusCode());\n";
+        }
+
+        $php .= "});\n";
 
         return $php;
     }

@@ -38,15 +38,21 @@ PHP);
 
         $contents = (string) file_get_contents($generated);
 
+        $this->assertStringContainsString('use Oxhq\\Preview\\Scenario\\ScenarioRunner;', $contents);
         $this->assertStringContainsString("it('replays checkout-flow preview scenario'", $contents);
-        $this->assertStringContainsString('preview:scenario:replay', $contents);
+        $this->assertStringContainsString("app(ScenarioRunner::class)->replay('checkout-flow', 'exact')", $contents);
+        $this->assertStringNotContainsString('preview:scenario:replay', $contents);
         $this->assertStringContainsString(
             'Precondition: run seed [Database\\Seeders\\CheckoutScenarioSeeder] before replaying this scenario.',
             $contents,
         );
-        $this->assertStringContainsString("->expectsOutputToContain('Seed: Database\\\\Seeders\\\\CheckoutScenarioSeeder')", $contents);
-        $this->assertStringContainsString("->expectsOutputToContain('Capture: cap_checkout_completed')", $contents);
-        $this->assertStringContainsString("->expectsOutputToContain('Capture: cap_order_created')", $contents);
+        $this->assertStringContainsString("\$this->assertSame('checkout-flow', \$result->scenario->name);", $contents);
+        $this->assertStringContainsString("\$this->assertSame('exact', \$result->mode);", $contents);
+        $this->assertStringContainsString("\$this->assertSame('Database\\\\Seeders\\\\CheckoutScenarioSeeder', \$result->seed);", $contents);
+        $this->assertStringContainsString('$this->assertCount(2, $result->captures);', $contents);
+        $this->assertStringContainsString("\$this->assertSame('cap_checkout_completed', \$result->captures[0]['id'] ?? null);", $contents);
+        $this->assertStringContainsString("\$this->assertSame('cap_order_created', \$result->captures[1]['id'] ?? null);", $contents);
+        $this->assertStringContainsString('$this->assertCount(2, $result->dispatches);', $contents);
         $this->assertStringContainsString(
             'Route replay expected: checkout.show',
             $contents,
@@ -55,8 +61,13 @@ PHP);
             'Route replay expected: checkout.success',
             $contents,
         );
-        $this->assertStringContainsString("->expectsOutputToContain('Route: checkout.show HTTP ')", $contents);
-        $this->assertStringContainsString("->expectsOutputToContain('Route: checkout.success HTTP ')", $contents);
+        $this->assertStringContainsString('$this->assertCount(2, $result->routes);', $contents);
+        $this->assertStringContainsString("\$this->assertSame('checkout.show', \$result->routes[0]->preview->name);", $contents);
+        $this->assertStringContainsString('$this->assertTrue($result->routes[0]->successful());', $contents);
+        $this->assertStringContainsString('$this->assertGreaterThanOrEqual(200, $result->routes[0]->response->getStatusCode());', $contents);
+        $this->assertStringContainsString('$this->assertLessThan(300, $result->routes[0]->response->getStatusCode());', $contents);
+        $this->assertStringContainsString("\$this->assertSame('checkout.success', \$result->routes[1]->preview->name);", $contents);
+        $this->assertStringContainsString('$this->assertTrue($result->routes[1]->successful());', $contents);
     }
 
     public function test_preview_scenario_test_rejects_missing_scenarios_clearly(): void

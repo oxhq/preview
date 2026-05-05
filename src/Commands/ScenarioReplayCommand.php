@@ -6,6 +6,7 @@ namespace Oxhq\Preview\Commands;
 
 use Illuminate\Console\Command;
 use Oxhq\Preview\Capture\ReplayResult;
+use Oxhq\Preview\Scenario\ScenarioReplayResult;
 use Oxhq\Preview\Scenario\ScenarioRunner;
 use Throwable;
 
@@ -36,14 +37,18 @@ final class ScenarioReplayCommand extends Command
             return self::FAILURE;
         }
 
+        $scenarioName = (string) $this->argument('scenario');
+        $mode = $resign ? 'resign' : 'exact';
+
         try {
             $result = $this->runner->replay(
-                (string) $this->argument('scenario'),
-                $resign ? 'resign' : 'exact',
+                $scenarioName,
+                $mode,
                 is_string($this->option('send-to')) ? (string) $this->option('send-to') : null,
             );
         } catch (Throwable $exception) {
             $this->error($exception->getMessage());
+            $this->error("Scenario replay failed before a result was available for [{$scenarioName}] using [{$mode}].");
 
             return self::FAILURE;
         }
@@ -57,6 +62,8 @@ final class ScenarioReplayCommand extends Command
         if ($result->captures === []) {
             $this->line('Captures: none');
         }
+
+        $failure = null;
 
         foreach ($result->captures as $index => $payload) {
             $this->line(sprintf(
@@ -73,15 +80,17 @@ final class ScenarioReplayCommand extends Command
                 $this->line('Replay dispatch: '.($dispatch->successful() ? 'success' : 'failure'));
 
                 if (! $dispatch->successful()) {
-                    return self::FAILURE;
+                    $failure ??= sprintf(
+                        'Scenario replay failed: dispatch for capture [%s] returned HTTP %d.',
+                        (string) $payload['id'],
+                        $dispatch->statusCode,
+                    );
                 }
             }
         }
 
         if ($result->routes === []) {
             $this->line('Routes: none');
-
-            return self::SUCCESS;
         }
 
         foreach ($result->routes as $route) {
@@ -94,10 +103,23 @@ final class ScenarioReplayCommand extends Command
             }
 
             if (! $route->successful()) {
-                return self::FAILURE;
+                $failure ??= "Scenario replay failed: route [{$route->preview->name}] returned HTTP {$statusCode}.";
             }
         }
 
+        $this->printSummary($result);
+
+        if ($failure !== null) {
+            $this->error($failure);
+
+            return self::FAILURE;
+        }
+
         return self::SUCCESS;
+    }
+
+    private function printSummary(ScenarioReplayResult $result): void
+    {
+        $this->line($result->summaryLine());
     }
 }

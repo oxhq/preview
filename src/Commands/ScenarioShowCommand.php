@@ -43,6 +43,7 @@ final class ScenarioShowCommand extends Command
         $this->line(sprintf('Routes (%d): %s', count($scenario->routes), $this->formatList($scenario->routes)));
         $this->line(sprintf('Captures (%d): %s', count($scenario->captures), $this->formatList($scenario->captures)));
         $this->line(sprintf('Fakes (%d): %s', count($scenario->fakes), $this->formatList($scenario->fakes)));
+        $this->printRouteContext($scenario->routeContext);
 
         if ($scenario->notes !== null && trim($scenario->notes) !== '') {
             $this->line('Notes: '.$scenario->notes);
@@ -61,5 +62,72 @@ final class ScenarioShowCommand extends Command
         }
 
         return implode(', ', $values);
+    }
+
+    /**
+     * @param array<string, array{session?: array<string, string>, guard?: string, user_id?: string, user_model?: class-string|string, readonly_db?: bool, fakes?: list<string>}> $routeContext
+     */
+    private function printRouteContext(array $routeContext): void
+    {
+        $routeContext = array_filter($routeContext);
+
+        if ($routeContext === []) {
+            return;
+        }
+
+        ksort($routeContext);
+
+        $this->line(sprintf('Route context (%d):', count($routeContext)));
+
+        foreach ($routeContext as $route => $context) {
+            $this->line(sprintf(
+                ' - %s: session keys (%d): %s; guard: %s; user: %s; readonly-db: %s; fakes: %s',
+                $route,
+                count($context['session'] ?? []),
+                $this->formatSessionKeys($context['session'] ?? []),
+                $context['guard'] ?? 'none',
+                $this->formatUser($context),
+                ($context['readonly_db'] ?? false) ? 'requested' : 'not requested',
+                $this->formatList($this->sortedList($context['fakes'] ?? [])),
+            ));
+        }
+    }
+
+    /**
+     * @param array<string, string> $session
+     */
+    private function formatSessionKeys(array $session): string
+    {
+        if ($session === []) {
+            return 'none';
+        }
+
+        $keys = array_keys($session);
+        sort($keys);
+
+        return implode(', ', $keys);
+    }
+
+    /**
+     * @param array{user_id?: string, user_model?: class-string|string} $context
+     */
+    private function formatUser(array $context): string
+    {
+        if (! isset($context['user_id'], $context['user_model'])) {
+            return 'none';
+        }
+
+        return "{$context['user_id']} via {$context['user_model']}";
+    }
+
+    /**
+     * @param list<string> $values
+     * @return list<string>
+     */
+    private function sortedList(array $values): array
+    {
+        sort($values);
+
+        return $values;
     }
 }

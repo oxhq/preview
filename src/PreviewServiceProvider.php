@@ -14,6 +14,7 @@ use Oxhq\Preview\Commands\CaptureShowCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
 use Oxhq\Preview\Commands\RoutePreviewCommand;
 use Oxhq\Preview\Commands\ScenarioListCommand;
+use Oxhq\Preview\Commands\ScenarioMakeCommand;
 use Oxhq\Preview\Commands\ScenarioReplayCommand;
 use Oxhq\Preview\Commands\ScenarioShowCommand;
 use Oxhq\Preview\Commands\ScenarioTestCommand;
@@ -181,6 +182,7 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureTestCommand::class,
                 RoutePreviewCommand::class,
                 ScenarioListCommand::class,
+                ScenarioMakeCommand::class,
                 ScenarioReplayCommand::class,
                 ScenarioShowCommand::class,
                 ScenarioTestCommand::class,

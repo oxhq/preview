@@ -22,4 +22,33 @@ final class ScenarioReplayResult
         public readonly array $routes = [],
     ) {
     }
+
+    /**
+     * @return array{seed: int, captures: int, dispatches: int, routes: int}
+     */
+    public function summaryCounts(): array
+    {
+        return [
+            'seed' => $this->seed === null || trim($this->seed) === '' ? 0 : 1,
+            'captures' => count($this->captures),
+            'dispatches' => count(array_filter(
+                $this->dispatches,
+                static fn (?ReplayResult $dispatch): bool => $dispatch instanceof ReplayResult,
+            )),
+            'routes' => count($this->routes),
+        ];
+    }
+
+    public function summaryLine(): string
+    {
+        $counts = $this->summaryCounts();
+
+        return sprintf(
+            'Summary: seed=%d captures=%d dispatches=%d routes=%d',
+            $counts['seed'],
+            $counts['captures'],
+            $counts['dispatches'],
+            $counts['routes'],
+        );
+    }
 }

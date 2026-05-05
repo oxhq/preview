@@ -27,18 +27,22 @@ final class ScenarioPestTestWriterTest extends TestCase
 
         $this->assertStringEndsWith('/Feature/Preview/Scenario/checkout-flowTest.php', $normalized);
         $this->assertStringStartsWith("<?php\n\n", $contents);
+        $this->assertStringContainsString('use Oxhq\\Preview\\Scenario\\ScenarioRunner;', $contents);
         $this->assertStringContainsString("it('replays checkout-flow preview scenario'", $contents);
-        $this->assertStringContainsString('preview:scenario:replay', $contents);
-        $this->assertStringContainsString("'scenario' => 'checkout-flow'", $contents);
-        $this->assertStringContainsString("'--exact' => true", $contents);
+        $this->assertStringContainsString("app(ScenarioRunner::class)->replay('checkout-flow', 'exact')", $contents);
+        $this->assertStringNotContainsString('preview:scenario:replay', $contents);
+        $this->assertStringContainsString("\$this->assertSame('checkout-flow', \$result->scenario->name);", $contents);
+        $this->assertStringContainsString("\$this->assertSame('exact', \$result->mode);", $contents);
 
         $this->assertStringContainsString(
             'Precondition: run seed [Database\\Seeders\\CheckoutScenarioSeeder] before replaying this scenario.',
             $contents,
         );
-        $this->assertStringContainsString("->expectsOutputToContain('Seed: Database\\\\Seeders\\\\CheckoutScenarioSeeder')", $contents);
-        $this->assertStringContainsString("->expectsOutputToContain('Capture: cap_checkout_completed')", $contents);
-        $this->assertStringContainsString("->expectsOutputToContain('Capture: cap_order_created')", $contents);
+        $this->assertStringContainsString("\$this->assertSame('Database\\\\Seeders\\\\CheckoutScenarioSeeder', \$result->seed);", $contents);
+        $this->assertStringContainsString('$this->assertCount(2, $result->captures);', $contents);
+        $this->assertStringContainsString("\$this->assertSame('cap_checkout_completed', \$result->captures[0]['id'] ?? null);", $contents);
+        $this->assertStringContainsString("\$this->assertSame('cap_order_created', \$result->captures[1]['id'] ?? null);", $contents);
+        $this->assertStringContainsString('$this->assertCount(2, $result->dispatches);', $contents);
         $this->assertStringContainsString(
             'Route replay expected: checkout.show',
             $contents,
@@ -47,20 +51,23 @@ final class ScenarioPestTestWriterTest extends TestCase
             'Route replay expected: checkout.success',
             $contents,
         );
-        $this->assertStringContainsString("->expectsOutputToContain('Route: checkout.show HTTP ')", $contents);
-        $this->assertStringContainsString("->expectsOutputToContain('Route: checkout.success HTTP ')", $contents);
+        $this->assertStringContainsString('$this->assertCount(2, $result->routes);', $contents);
+        $this->assertStringContainsString("\$this->assertSame('checkout.show', \$result->routes[0]->preview->name);", $contents);
+        $this->assertStringContainsString('$this->assertTrue($result->routes[0]->successful());', $contents);
+        $this->assertStringContainsString('$this->assertGreaterThanOrEqual(200, $result->routes[0]->response->getStatusCode());', $contents);
+        $this->assertStringContainsString('$this->assertLessThan(300, $result->routes[0]->response->getStatusCode());', $contents);
+        $this->assertStringContainsString("\$this->assertSame('checkout.success', \$result->routes[1]->preview->name);", $contents);
+        $this->assertStringContainsString('$this->assertTrue($result->routes[1]->successful());', $contents);
 
         $this->assertPhpFileIsLintable($path);
         $this->assertGeneratedPestTestIsStructurallyRunnable($path, [
             'description' => 'replays checkout-flow preview scenario',
             'scenario' => 'checkout-flow',
-            'expected_output_contains' => [
-                'Seed: Database\\Seeders\\CheckoutScenarioSeeder',
-                'Capture: cap_checkout_completed',
-                'Capture: cap_order_created',
-                'Route: checkout.show HTTP ',
-                'Route: checkout.success HTTP ',
-            ],
+            'mode' => 'exact',
+            'seed' => 'Database\\Seeders\\CheckoutScenarioSeeder',
+            'captures' => ['cap_checkout_completed', 'cap_order_created'],
+            'routes' => ['checkout.show', 'checkout.success'],
+            'dispatches' => 2,
         ]);
     }
 
@@ -75,8 +82,10 @@ final class ScenarioPestTestWriterTest extends TestCase
         $this->assertStringContainsString('Precondition: no scenario seed configured.', $contents);
         $this->assertStringContainsString('Captures: none listed for this scenario.', $contents);
         $this->assertStringContainsString('Routes: none listed for this scenario.', $contents);
-        $this->assertStringContainsString("->expectsOutputToContain('Captures: none')", $contents);
-        $this->assertStringContainsString("->expectsOutputToContain('Routes: none')", $contents);
+        $this->assertStringContainsString('$this->assertNull($result->seed);', $contents);
+        $this->assertStringContainsString('$this->assertCount(0, $result->captures);', $contents);
+        $this->assertStringContainsString('$this->assertCount(0, $result->routes);', $contents);
+        $this->assertStringNotContainsString('$this->assertCount(0, $result->dispatches);', $contents);
         $this->assertPhpFileIsLintable($path);
     }
 
@@ -100,7 +109,7 @@ final class ScenarioPestTestWriterTest extends TestCase
     }
 
     /**
-     * @param array{description: string, scenario: string, expected_output_contains: list<string>} $expected
+     * @param array{description: string, scenario: string, mode: string, seed: string|null, captures: list<string>, routes: list<string>, dispatches: int|null} $expected
      */
     private function assertGeneratedPestTestIsStructurallyRunnable(string $path, array $expected): void
     {
@@ -111,6 +120,14 @@ final class ScenarioPestTestWriterTest extends TestCase
 <?php
 
 declare(strict_types=1);
+
+require getcwd().'/vendor/autoload.php';
+
+use Oxhq\Preview\Route\RoutePreview;
+use Oxhq\Preview\Scenario\Scenario;
+use Oxhq\Preview\Scenario\ScenarioReplayResult;
+use Oxhq\Preview\Scenario\ScenarioRouteResult;
+use Symfony\Component\HttpFoundation\Response;
 
 $generatedPath = $argv[1] ?? null;
 $expectedPath = $argv[2] ?? null;
@@ -137,6 +154,12 @@ final class PreviewScenarioGeneratedPestHarness
     public static ?string $description = null;
 
     public static ?Closure $test = null;
+
+    /** @var array{description: string, scenario: string, mode: string, seed: string|null, captures: list<string>, routes: list<string>, dispatches: int|null}|null */
+    public static ?array $expected = null;
+
+    /** @var list<array{0: string, 1: string, 2: string|null}> */
+    public static array $replayCalls = [];
 }
 
 function it(string $description, Closure $test): void
@@ -145,6 +168,66 @@ function it(string $description, Closure $test): void
     PreviewScenarioGeneratedPestHarness::$test = $test;
 }
 
+function app(?string $abstract = null): object
+{
+    if ($abstract !== \Oxhq\Preview\Scenario\ScenarioRunner::class) {
+        fwrite(STDERR, 'Generated Pest test resolved the wrong service.');
+        exit(13);
+    }
+
+    return new class {
+        public function replay(string $scenarioName, string $mode, ?string $sendTo = null): ScenarioReplayResult
+        {
+            PreviewScenarioGeneratedPestHarness::$replayCalls[] = [$scenarioName, $mode, $sendTo];
+            $expected = PreviewScenarioGeneratedPestHarness::$expected;
+
+            if (! is_array($expected)) {
+                fwrite(STDERR, 'Expected assertion payload was not loaded.');
+                exit(14);
+            }
+
+            $captures = array_map(
+                static fn (string $capture): array => ['id' => $capture],
+                $expected['captures'],
+            );
+            $routes = array_map(
+                static fn (string $route): ScenarioRouteResult => new ScenarioRouteResult(
+                    new RoutePreview(
+                        name: $route,
+                        uri: '/'.$route,
+                        action: 'GeneratedScenarioHarnessController',
+                        domain: null,
+                        methods: ['GET'],
+                        middleware: [],
+                        executionMethod: 'GET',
+                        url: 'http://localhost/'.$route,
+                        expiresAt: new \DateTimeImmutable('+5 minutes'),
+                    ),
+                    new Response('ok', 200),
+                ),
+                $expected['routes'],
+            );
+            $dispatches = array_fill(0, $expected['dispatches'] ?? 0, null);
+
+            return new ScenarioReplayResult(
+                scenario: new Scenario(
+                    name: $expected['scenario'],
+                    seed: $expected['seed'],
+                    routes: $expected['routes'],
+                    captures: $expected['captures'],
+                ),
+                mode: $mode,
+                seed: $expected['seed'],
+                captures: $captures,
+                dispatches: $dispatches,
+                routes: $routes,
+            );
+        }
+    };
+}
+
+PreviewScenarioGeneratedPestHarness::$expected = $expected;
+
 require $generatedPath;
 
 if (PreviewScenarioGeneratedPestHarness::$test === null) {
@@ -152,39 +235,9 @@ if (PreviewScenarioGeneratedPestHarness::$test === null) {
     exit(5);
 }
 
-$testCase = new class {
-    /** @var list<array{0: string, 1: array<string, mixed>}> */
-    public array $artisanCalls = [];
-
-    public ?object $artisanResult = null;
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    public function artisan(string $command, array $arguments): object
+$testCase = new class('runTest') extends \PHPUnit\Framework\TestCase {
+    public function runTest(): void
     {
-        $this->artisanCalls[] = [$command, $arguments];
-
-        return $this->artisanResult = new class {
-            /** @var list<string> */
-            public array $expectedOutputContains = [];
-
-            public ?int $exitCode = null;
-
-            public function expectsOutputToContain(string $output): self
-            {
-                $this->expectedOutputContains[] = $output;
-
-                return $this;
-            }
-
-            public function assertExitCode(int $exitCode): self
-            {
-                $this->exitCode = $exitCode;
-
-                return $this;
-            }
-        };
     }
 };
 
@@ -196,41 +249,26 @@ if (PreviewScenarioGeneratedPestHarness::$description !== $expected['description
     exit(6);
 }
 
-if (count($testCase->artisanCalls) !== 1) {
-    fwrite(STDERR, 'Generated Pest test should call artisan exactly once.');
+if (count(PreviewScenarioGeneratedPestHarness::$replayCalls) !== 1) {
+    fwrite(STDERR, 'Generated Pest test should replay exactly once.');
     exit(7);
 }
 
-[$command, $arguments] = $testCase->artisanCalls[0];
+[$scenarioName, $mode, $sendTo] = PreviewScenarioGeneratedPestHarness::$replayCalls[0];
 
-if ($command !== 'preview:scenario:replay') {
-    fwrite(STDERR, 'Generated Pest test called the wrong artisan command.');
-    exit(8);
-}
-
-if (($arguments['scenario'] ?? null) !== $expected['scenario']) {
-    fwrite(STDERR, 'Generated Pest test passed the wrong scenario argument.');
+if ($scenarioName !== $expected['scenario']) {
+    fwrite(STDERR, 'Generated Pest test replayed the wrong scenario.');
     exit(9);
 }
 
-if (($arguments['--exact'] ?? null) !== true) {
-    fwrite(STDERR, 'Generated Pest test should replay with --exact.');
+if ($mode !== $expected['mode']) {
+    fwrite(STDERR, 'Generated Pest test should replay in exact mode.');
     exit(10);
 }
 
-if ($testCase->artisanResult === null || $testCase->artisanResult->exitCode !== 0) {
-    fwrite(STDERR, 'Generated Pest test should assert exit code 0.');
+if ($sendTo !== null) {
+    fwrite(STDERR, 'Generated Pest test should not dispatch scenario replays.');
     exit(11);
-}
-
-$missing = array_values(array_diff(
-    $expected['expected_output_contains'],
-    $testCase->artisanResult->expectedOutputContains,
-));
-
-if ($missing !== []) {
-    fwrite(STDERR, 'Missing generated output expectations: '.implode(', ', $missing));
-    exit(12);
 }
 
 echo 'Generated scenario Pest test is structurally runnable.';

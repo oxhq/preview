@@ -31,8 +31,8 @@ PHP);
 
         $this->artisan('preview:scenario:list')
             ->expectsOutput('Preview scenarios:')
-            ->expectsOutput(' - checkout-flow (captures: 0, routes: 0, fakes: 0)')
-            ->expectsOutput(' - refund-flow (captures: 0, routes: 0, fakes: 0)')
+            ->expectsOutput(' - checkout-flow (captures: 0, routes: 0, route-contexts: 0, fakes: 0)')
+            ->expectsOutput(' - refund-flow (captures: 0, routes: 0, route-contexts: 0, fakes: 0)')
             ->assertExitCode(0);
     }
 
@@ -80,6 +80,19 @@ return new Scenario(
     name: 'checkout-flow',
     seed: 'Database\\Seeders\\CheckoutScenarioSeeder',
     routes: ['checkout.show'],
+    routeContext: [
+        'checkout.show' => [
+            'session' => [
+                'tenant' => 'acme',
+                'cart_id' => 'secret-cart-token',
+            ],
+            'guard' => 'client',
+            'user_id' => '42',
+            'user_model' => 'App\\Models\\User',
+            'readonly_db' => true,
+            'fakes' => ['queue', 'mail'],
+        ],
+    ],
     captures: ['stripe.checkout.completed'],
     fakes: ['mail'],
     notes: 'Happy-path checkout',
@@ -92,6 +105,8 @@ PHP);
             ->expectsOutput('Routes (1): checkout.show')
             ->expectsOutput('Captures (1): stripe.checkout.completed')
             ->expectsOutput('Fakes (1): mail')
+            ->expectsOutput('Route context (1):')
+            ->expectsOutput(' - checkout.show: session keys (2): cart_id, tenant; guard: client; user: 42 via App\\Models\\User; readonly-db: requested; fakes: mail, queue')
             ->expectsOutput('Notes: Happy-path checkout')
             ->assertExitCode(0);
     }

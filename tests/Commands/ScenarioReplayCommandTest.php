@@ -54,6 +54,7 @@ PHP, $capture->id));
             ->expectsOutput('Seed: '.CommandRecordingScenarioSeeder::class)
             ->expectsOutput("Capture: {$capture->id} POST /webhooks/orders")
             ->expectsOutput('Route: checkout.show HTTP 200')
+            ->expectsOutput('Summary: seed=1 captures=1 dispatches=0 routes=1')
             ->assertExitCode(0);
 
         $this->assertSame(1, CommandRecordingScenarioSeeder::$runs);
@@ -82,6 +83,7 @@ PHP, $capture->id));
         ])
             ->expectsOutput('Scenario replay ready for [signed-flow] using [resign].')
             ->expectsOutput("Capture: {$capture->id} POST /webhooks/signed")
+            ->expectsOutput('Summary: seed=0 captures=1 dispatches=0 routes=0')
             ->assertExitCode(0);
     }
 
@@ -94,6 +96,7 @@ PHP, $capture->id));
             '--exact' => true,
         ])
             ->expectsOutput('Scenario [missing-flow] was not found.')
+            ->expectsOutput('Scenario replay failed before a result was available for [missing-flow] using [exact].')
             ->assertExitCode(1);
     }
 
@@ -118,6 +121,7 @@ PHP);
             '--exact' => true,
         ])
             ->expectsOutput('Capture [missing-capture] was not found.')
+            ->expectsOutput('Scenario replay failed before a result was available for [missing-capture-flow] using [exact].')
             ->assertExitCode(1);
     }
 
@@ -171,11 +175,47 @@ PHP, $capture->id));
             ->expectsOutput("Capture: {$capture->id} POST /webhooks/orders")
             ->expectsOutput('Replay HTTP status: 204')
             ->expectsOutput('Replay dispatch: success')
+            ->expectsOutput('Summary: seed=0 captures=1 dispatches=1 routes=0')
             ->assertExitCode(0);
 
         $this->assertSame('https://receiver.test/webhooks/orders', $requests[0]['url']);
         $this->assertSame('POST', $requests[0]['method']);
         $this->assertSame('{"ok":true}', $requests[0]['body']);
+    }
+
+    public function test_preview_scenario_replay_reports_failed_dispatch_with_summary(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+        $capture = $this->storeGenericCapture('/webhooks/orders');
+
+        $this->app->instance(HttpReplayDispatcher::class, new HttpReplayDispatcher(
+            fn (): ReplayResult => new ReplayResult(500, 'receiver down'),
+        ));
+
+        $this->writeScenario($path, 'dispatch-failure.php', sprintf(<<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'dispatch-failure-flow',
+    captures: ['%s'],
+);
+PHP, $capture->id));
+
+        $this->artisan('preview:scenario:replay', [
+            'scenario' => 'dispatch-failure-flow',
+            '--exact' => true,
+            '--send-to' => 'https://receiver.test',
+        ])
+            ->expectsOutput('Scenario replay ready for [dispatch-failure-flow] using [exact].')
+            ->expectsOutput("Capture: {$capture->id} POST /webhooks/orders")
+            ->expectsOutput('Replay HTTP status: 500')
+            ->expectsOutput('Replay dispatch: failure')
+            ->expectsOutput('Summary: seed=0 captures=1 dispatches=1 routes=0')
+            ->expectsOutput("Scenario replay failed: dispatch for capture [{$capture->id}] returned HTTP 500.")
+            ->assertExitCode(1);
     }
 
     private function storeGenericCapture(string $path): object
