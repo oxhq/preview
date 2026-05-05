@@ -30,6 +30,8 @@ final class RoutePreview
         public readonly array $session = [],
         public readonly bool $readonlyDb = false,
         public readonly ?string $guard = null,
+        public readonly ?string $userId = null,
+        public readonly ?string $userModel = null,
         public readonly array $fakes = [],
         public readonly array $warnings = [],
     ) {

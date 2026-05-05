@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Oxhq\Preview\Tests\Route;
 
+use Illuminate\Auth\GenericUser;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +21,7 @@ final class RoutePreviewHardeningTest extends TestCase
     protected function tearDown(): void
     {
         Carbon::setTestNow();
+        RoutePreviewAuthenticatableUser::$users = [];
 
         parent::tearDown();
     }
@@ -162,6 +166,68 @@ final class RoutePreviewHardeningTest extends TestCase
             ->assertExitCode(0);
     }
 
+    public function test_signed_preview_link_can_resolve_app_specific_user_context_for_proxied_request(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-04 12:00:00', 'UTC'));
+        RoutePreviewAuthenticatableUser::$users = [
+            '42' => new RoutePreviewAuthenticatableUser(['id' => '42', 'name' => 'Ada']),
+        ];
+        config()->set('auth.guards.preview', [
+            'driver' => 'session',
+            'provider' => 'users',
+        ]);
+
+        Route::get('/auth-context', fn () => response()->json([
+            'request_user' => request()->user()?->getAuthIdentifier(),
+            'request_guard_user' => request()->user('preview')?->getAuthIdentifier(),
+            'auth_user' => Auth::user()?->getAuthIdentifier(),
+            'guard' => Auth::getDefaultDriver(),
+        ]))->name('preview.auth-context');
+
+        $preview = app(RoutePreviewService::class)->preview(
+            routeName: 'preview.auth-context',
+            ttl: '30m',
+            guard: 'preview',
+            userId: '42',
+            userModel: RoutePreviewAuthenticatableUser::class,
+        );
+
+        $this->assertSame('42', $preview->userId);
+        $this->assertSame('preview', $preview->guard);
+        $this->assertSame(RoutePreviewAuthenticatableUser::class, $preview->userModel);
+        $this->assertStringContainsString('_preview_user_id=42', $preview->url);
+        $this->assertStringContainsString('_preview_user_model=', $preview->url);
+
+        $this->get($preview->url)
+            ->assertOk()
+            ->assertJson([
+                'request_user' => '42',
+                'request_guard_user' => '42',
+                'auth_user' => '42',
+                'guard' => 'preview',
+            ]);
+
+        $this->assertNull(Auth::user());
+    }
+
+    public function test_signed_preview_link_rejects_unresolvable_user_context(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-04 12:00:00', 'UTC'));
+        RoutePreviewAuthenticatableUser::$users = [];
+
+        Route::get('/missing-auth-context', fn (): string => 'should not run')
+            ->name('preview.missing-auth-context');
+
+        $preview = app(RoutePreviewService::class)->preview(
+            routeName: 'preview.missing-auth-context',
+            ttl: '30m',
+            userId: '404',
+            userModel: RoutePreviewAuthenticatableUser::class,
+        );
+
+        $this->get($preview->url)->assertForbidden();
+    }
+
     public function test_readonly_db_rolls_back_database_writes_in_proxied_request(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-04 12:00:00', 'UTC'));
@@ -228,5 +294,18 @@ final class RoutePreviewHardeningTest extends TestCase
             $table->increments('id');
             $table->string('message');
         });
+    }
+}
+
+final class RoutePreviewAuthenticatableUser extends GenericUser
+{
+    /**
+     * @var array<string, self>
+     */
+    public static array $users = [];
+
+    public static function find(string $id): ?Authenticatable
+    {
+        return self::$users[$id] ?? null;
     }
 }

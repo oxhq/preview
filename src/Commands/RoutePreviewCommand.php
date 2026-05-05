@@ -17,6 +17,8 @@ final class RoutePreviewCommand extends Command
         {--session=* : Session value as "name=value"; may be repeated}
         {--readonly-db : Mark the link with database-readonly intent and print safety warnings}
         {--guard= : Guard/session context label to record on the preview link}
+        {--user-id= : Authenticate the proxied preview request as this user id when a user model is available}
+        {--user-model= : Authenticatable model class used to resolve --user-id; falls back to preview.route_preview.user_model}
         {--allow-write : Explicitly allow non-GET/HEAD routes}
         {--fake-queue : Fake queued jobs during proxied execution where Laravel bindings are available}
         {--fake-mail : Fake mail during proxied execution where Laravel bindings are available}
@@ -41,6 +43,8 @@ final class RoutePreviewCommand extends Command
                 readonlyDb: (bool) $this->option('readonly-db'),
                 guard: is_string($this->option('guard')) ? (string) $this->option('guard') : null,
                 session: $this->keyValueOptions((array) $this->option('session')),
+                userId: is_string($this->option('user-id')) ? (string) $this->option('user-id') : null,
+                userModel: is_string($this->option('user-model')) ? (string) $this->option('user-model') : null,
                 allowWrite: (bool) $this->option('allow-write'),
                 fakes: $this->fakes(),
             );
@@ -71,6 +75,10 @@ final class RoutePreviewCommand extends Command
 
         if ($preview->session !== []) {
             $this->line('Session: '.$this->formatParameters($preview->session));
+        }
+
+        if ($preview->userId !== null && $preview->userModel !== null) {
+            $this->line("User: {$preview->userId} via {$preview->userModel}");
         }
 
         if ($preview->fakes !== []) {

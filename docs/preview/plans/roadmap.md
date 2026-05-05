@@ -75,9 +75,10 @@ CLI target:
 
 ```bash
 php artisan preview:route {route} --ttl=2h --param=id=123 --session=currency=usd --readonly-db --guard=client
+php artisan preview:route {route} --ttl=2h --param=id=123 --user-id=42 --user-model="App\Models\User" --guard=web
 ```
 
-v0.3 now splits into two parallel route-preview slices.
+v0.3 now includes shipped proxy hardening, behavior-tested fakes, and app-specific auth context.
 
 Slice A: signed proxy execution and safety controls:
 
@@ -102,9 +103,24 @@ Slice B: parameter, signature, warning, and audit hardening:
 - clearer warnings for uncovered side effects and unsafe methods
 - audit output for route, method, params, session context keys, guard metadata, TTL, safety flags, and execution mode
 
+Slice C: behavior-tested mail fake coverage:
+
+- prove `--fake-mail` applies Laravel mail faking during proxied route execution, not only command metadata output
+- cover mail suppression with a route that would otherwise send mail
+- document that mail faking does not isolate queues, events, external HTTP, cache, filesystem, or database writes unless the corresponding supported safety flag or `--readonly-db` applies
+
+Slice D: app-specific auth context:
+
+- add explicit authenticated preview input through `--user-id`
+- allow optional `--user-model=App\Models\User` when the host app needs a concrete authenticatable model class
+- keep `--guard` as guard selection and request/audit metadata, not a standalone impersonation flag
+- execute auth setup through Laravel's normal app auth stack for the selected guard and user model
+- fail clearly when the user cannot be resolved, the model is not authenticatable, or the selected guard cannot authenticate that user
+- avoid any claim of generic authorization bypass, policy bypass, middleware bypass, or full scenario isolation
+
 Do not call it `--readonly`. `--readonly-db` is not a complete read-only guarantee: it only covers database writes inside the wrapped preview request. It does not cover queues, mail, cache, filesystem writes, external HTTP calls, or events unless explicit fake flags are used for the side effects the package supports.
 
-`--guard` remains request metadata in v0.3. Do not claim full auth, guard switching, or user impersonation unless a later app-specific impersonation slice exists and is tested.
+`--guard` remains guard selection plus request metadata. Do not claim full auth, generic guard switching, authorization bypass, or user impersonation beyond the explicit app-specific `--user-id` auth context that is behavior-tested.
 
 Route preview does not provide filesystem isolation or cache isolation.
 

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Oxhq\Preview\Http;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Routing\UrlGenerator;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -40,6 +42,8 @@ final class RoutePreviewController
         $target->attributes->set('preview.readonly_db', $request->query('_preview_readonly_db') === '1');
         $target->attributes->set('preview.guard', $request->query('_preview_guard'));
         $target->attributes->set('preview.session', $this->session($request));
+        $target->attributes->set('preview.user_id', $request->query('_preview_user_id'));
+        $target->attributes->set('preview.user_model', $request->query('_preview_user_model'));
         $target->attributes->set('preview.fakes', $this->fakes($request));
         $target->setLaravelSession($this->sessionStore($request));
 
@@ -59,6 +63,7 @@ final class RoutePreviewController
         }
 
         $sessionSnapshot = $this->seedSessionManager($target);
+        $authSnapshot = $this->applyAuthContext($target);
 
         app()->instance('request', $target);
 
@@ -66,7 +71,85 @@ final class RoutePreviewController
             return $this->router->dispatch($target);
         } finally {
             app()->instance('request', $original);
+            $this->restoreAuthContext($authSnapshot);
             $this->restoreSessionManager($sessionSnapshot);
+        }
+    }
+
+    /**
+     * @return array{guard: mixed, previous_user: Authenticatable|null, default_guard: string|null}|null
+     */
+    private function applyAuthContext(Request $target): ?array
+    {
+        $userId = $target->attributes->get('preview.user_id');
+        $userModel = $target->attributes->get('preview.user_model');
+
+        if (! is_string($userId) || $userId === '') {
+            return null;
+        }
+
+        if (! is_string($userModel) || $userModel === '' || ! class_exists($userModel) || ! is_callable([$userModel, 'find'])) {
+            abort(403, 'Preview route user context could not be resolved.');
+        }
+
+        $user = $userModel::find($userId);
+
+        if (! $user instanceof Authenticatable) {
+            abort(403, 'Preview route user context could not be resolved.');
+        }
+
+        $guardName = $target->attributes->get('preview.guard');
+        $guardName = is_string($guardName) && $guardName !== '' ? $guardName : null;
+        $defaultGuard = null;
+
+        try {
+            $defaultGuard = Auth::getDefaultDriver();
+            $guard = $guardName === null ? Auth::guard() : Auth::guard($guardName);
+
+            if ($guardName !== null) {
+                Auth::shouldUse($guardName);
+            }
+        } catch (Throwable) {
+            abort(403, 'Preview route guard context could not be resolved.');
+        }
+
+        $previousUser = method_exists($guard, 'user') ? $guard->user() : null;
+        $previousUser = $previousUser instanceof Authenticatable ? $previousUser : null;
+
+        if (! method_exists($guard, 'setUser')) {
+            abort(403, 'Preview route guard context could not be resolved.');
+        }
+
+        $guard->setUser($user);
+        $target->setUserResolver(fn (?string $guard = null): Authenticatable => $user);
+
+        return [
+            'guard' => $guard,
+            'previous_user' => $previousUser,
+            'default_guard' => $defaultGuard,
+        ];
+    }
+
+    /**
+     * @param array{guard: mixed, previous_user: Authenticatable|null, default_guard: string|null}|null $snapshot
+     */
+    private function restoreAuthContext(?array $snapshot): void
+    {
+        if ($snapshot === null) {
+            return;
+        }
+
+        $guard = $snapshot['guard'];
+        $previousUser = $snapshot['previous_user'];
+
+        if ($previousUser instanceof Authenticatable && method_exists($guard, 'setUser')) {
+            $guard->setUser($previousUser);
+        } elseif (method_exists($guard, 'forgetUser')) {
+            $guard->forgetUser();
+        }
+
+        if ($snapshot['default_guard'] !== null) {
+            Auth::shouldUse($snapshot['default_guard']);
         }
     }
 

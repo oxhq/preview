@@ -59,6 +59,7 @@ return [
         'enabled' => env('PREVIEW_ROUTE_PREVIEW_ENABLED', true),
         'path' => env('PREVIEW_ROUTE_PREVIEW_PATH', '/__preview/route/{route}'),
         'default_ttl' => env('PREVIEW_ROUTE_PREVIEW_TTL', '2h'),
+        'user_model' => env('PREVIEW_ROUTE_PREVIEW_USER_MODEL'),
     ],
 
     'hmac' => [

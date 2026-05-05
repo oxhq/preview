@@ -377,6 +377,7 @@ The route preview command generates signed, time-limited access to a named Larav
 
 ```bash
 php artisan preview:route {route} --ttl=2h --param=id=123 --session=currency=usd --readonly-db --guard=client
+php artisan preview:route {route} --ttl=2h --param=id=123 --user-id=42 --user-model="App\Models\User" --guard=web
 ```
 
 Example:
@@ -401,13 +402,15 @@ v0.3 route preview scope:
 - proxied execution of the named route through the signed preview link
 - `--readonly-db` transaction rollback for covered database writes inside the wrapped request
 - behavior-tested side-effect fake flags for supported queue, mail, HTTP, and event facades
+- behavior-tested mail fake coverage that proves route preview suppresses Laravel mail side effects when `--fake-mail` is present
+- app-specific auth context using `--user-id` plus optional `--user-model`, where `--guard` selects or records the guard context but does not by itself authenticate a user
 - expiry, signature, parameter, warning, and audit-output tests
 
 `--readonly-db` is not a complete read-only guarantee. It only covers database writes performed inside the wrapped preview request transaction.
 
 Database transaction rollback does not protect queues, mail, cache, filesystem writes, external HTTP calls, or events unless the specific side effect is covered by an explicit fake flag.
 
-`--guard` does not impersonate an authenticated user or switch Laravel guards in v0.3. It is preserved as preview request metadata for auditability until a later app-specific impersonation design exists.
+`--guard` does not by itself impersonate an authenticated user. Authenticated route preview must be explicit and app-specific: `--user-id` identifies an application user, optional `--user-model` resolves the model class when the app cannot rely on the default authenticatable model, and `--guard` is still the guard selection plus audit metadata. This design must not claim generic authorization bypass, policy bypass, middleware bypass, or complete scenario isolation.
 
 Route preview does not provide filesystem isolation or cache isolation.
 

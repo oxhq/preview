@@ -29,6 +29,8 @@ final class RoutePreviewService
         bool $readonlyDb = false,
         ?string $guard = null,
         array $session = [],
+        ?string $userId = null,
+        ?string $userModel = null,
         bool $allowWrite = false,
         array $fakes = [],
     ): RoutePreview {
@@ -55,6 +57,8 @@ final class RoutePreviewService
         $middleware = array_values(array_map('strval', $route->gatherMiddleware()));
         $executionMethod = $this->executionMethod($methods, $allowWrite);
         $session = $this->normalizeStringMap($session);
+        $userId = $this->normalizeNullableString($userId);
+        $userModel = $this->resolveUserModel($userId, $userModel);
         $fakes = $this->normalizeFakes($fakes);
         $query = [
             'route' => $routeName,
@@ -76,6 +80,11 @@ final class RoutePreviewService
 
         if ($guard !== null && trim($guard) !== '') {
             $query['_preview_guard'] = trim($guard);
+        }
+
+        if ($userId !== null && $userModel !== null) {
+            $query['_preview_user_id'] = $userId;
+            $query['_preview_user_model'] = $userModel;
         }
 
         if ($fakes !== []) {
@@ -103,6 +112,14 @@ final class RoutePreviewService
             $warnings[] = 'Session context is attached to the proxied request; it does not authenticate a user or bypass authorization.';
         }
 
+        if ($userId !== null && $userModel !== null) {
+            $warnings[] = sprintf(
+                'User [%s] will be resolved through [%s] during proxied execution; application middleware and policies still decide authorization.',
+                $userId,
+                $userModel,
+            );
+        }
+
         foreach ($fakes as $fake) {
             $warnings[] = "Preview will request fake [{$fake}] during proxied execution.";
         }
@@ -121,6 +138,8 @@ final class RoutePreviewService
             session: $session,
             readonlyDb: $readonlyDb,
             guard: $guard !== null && trim($guard) !== '' ? trim($guard) : null,
+            userId: $userId,
+            userModel: $userModel,
             fakes: $fakes,
             warnings: $warnings,
         );
@@ -213,6 +232,35 @@ final class RoutePreviewService
         }
 
         return $normalized;
+    }
+
+    private function normalizeNullableString(?string $value): ?string
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+
+        return trim($value);
+    }
+
+    private function resolveUserModel(?string $userId, ?string $userModel): ?string
+    {
+        if ($userId === null) {
+            return null;
+        }
+
+        $configured = $this->normalizeNullableString($userModel);
+
+        if ($configured === null && function_exists('config')) {
+            $value = config('preview.route_preview.user_model');
+            $configured = is_string($value) ? $this->normalizeNullableString($value) : null;
+        }
+
+        if ($configured === null) {
+            throw new RuntimeException('Pass --user-model or configure preview.route_preview.user_model to use --user-id.');
+        }
+
+        return $configured;
     }
 
     private function expiresAt(string $ttl): DateTimeImmutable

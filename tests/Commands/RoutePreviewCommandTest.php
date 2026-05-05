@@ -72,6 +72,40 @@ final class RoutePreviewCommandTest extends TestCase
             ->assertExitCode(1);
     }
 
+    public function test_preview_route_command_prints_user_context_when_requested(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-03 12:00:00', 'UTC'));
+
+        Route::get('/auth-context', fn (): string => 'ok')
+            ->name('preview.auth-context');
+
+        $this->artisan('preview:route', [
+            'route' => 'preview.auth-context',
+            '--ttl' => '30m',
+            '--user-id' => '42',
+            '--user-model' => RoutePreviewCommandTestUser::class,
+        ])
+            ->expectsOutput('Route: preview.auth-context')
+            ->expectsOutput('User: 42 via '.RoutePreviewCommandTestUser::class)
+            ->expectsOutput('Warnings:')
+            ->expectsOutput(' - User [42] will be resolved through ['.RoutePreviewCommandTestUser::class.'] during proxied execution; application middleware and policies still decide authorization.')
+            ->assertExitCode(0);
+    }
+
+    public function test_preview_route_command_requires_user_model_for_user_context(): void
+    {
+        Route::get('/auth-context', fn (): string => 'ok')
+            ->name('preview.auth-context');
+
+        $this->artisan('preview:route', [
+            'route' => 'preview.auth-context',
+            '--ttl' => '30m',
+            '--user-id' => '42',
+        ])
+            ->expectsOutput('Pass --user-model or configure preview.route_preview.user_model to use --user-id.')
+            ->assertExitCode(1);
+    }
+
     public function test_preview_route_command_rejects_missing_route_parameters(): void
     {
         Route::get('/accounts/{account}/dashboard', fn (string $account): string => $account)
@@ -108,4 +142,8 @@ final class RoutePreviewCommandTest extends TestCase
             ->expectsOutput(' - Route includes non-read methods [POST]. Database rollback does not protect queues, mail, cache, filesystem writes, events, or external HTTP calls.')
             ->assertExitCode(0);
     }
+}
+
+final class RoutePreviewCommandTestUser
+{
 }

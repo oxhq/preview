@@ -109,7 +109,9 @@ Route preview creates signed, time-limited links for named Laravel routes and pr
 
 `--readonly-db` wraps the covered request in a database transaction so database writes can be rolled back. It is not a complete read-only guarantee: queues, mail, cache, filesystem writes, external HTTP, and events are outside that database wrapper unless explicit fake flags are used for the side effects the package supports.
 
-Repeated `--session=key=value` flags carry session context into the proxied preview request. `--guard` is request metadata only; route preview does not implement full auth impersonation, filesystem isolation, or cache isolation.
+Repeated `--session=key=value` flags carry session context into the proxied preview request. `--user-id` plus optional `--user-model` can attach an app-specific authenticated user context for the proxied request. `--guard` selects the guard for that explicit user context and remains audit metadata; by itself it does not authenticate a user, isolate the filesystem, or isolate cache.
+
+Route preview now behavior-tests the supported queue, mail, HTTP, and event fakes. The auth context is not a generic authorization bypass, policy bypass, or full scenario-isolation feature.
 
 ## Current Proof Boundary
 

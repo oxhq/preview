@@ -126,6 +126,45 @@ final class RoutePreviewServiceTest extends TestCase
         );
     }
 
+    public function test_it_requires_user_model_when_user_id_context_is_requested(): void
+    {
+        Route::get('/auth-context', fn (): string => 'ok')
+            ->name('preview.auth-context');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Pass --user-model or configure preview.route_preview.user_model to use --user-id.');
+
+        app(RoutePreviewService::class)->preview(
+            routeName: 'preview.auth-context',
+            ttl: '30m',
+            userId: '42',
+        );
+    }
+
+    public function test_it_uses_configured_user_model_for_user_id_context(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-03 12:00:00', 'UTC'));
+        config()->set('preview.route_preview.user_model', RoutePreviewServiceTestUser::class);
+
+        Route::get('/auth-context', fn (): string => 'ok')
+            ->name('preview.auth-context');
+
+        $preview = app(RoutePreviewService::class)->preview(
+            routeName: 'preview.auth-context',
+            ttl: '30m',
+            userId: '42',
+        );
+
+        $this->assertSame('42', $preview->userId);
+        $this->assertSame(RoutePreviewServiceTestUser::class, $preview->userModel);
+        $this->assertStringContainsString('_preview_user_id=42', $preview->url);
+        $this->assertStringContainsString('_preview_user_model=', $preview->url);
+        $this->assertContains(
+            'User [42] will be resolved through ['.RoutePreviewServiceTestUser::class.'] during proxied execution; application middleware and policies still decide authorization.',
+            $preview->warnings,
+        );
+    }
+
     public function test_it_allows_write_routes_with_explicit_opt_in_and_returns_warnings(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-03 12:00:00', 'UTC'));
@@ -145,4 +184,8 @@ final class RoutePreviewServiceTest extends TestCase
         $this->assertStringContainsString('/__preview/route/preview.orders.store', $preview->url);
         $this->assertContains('Route includes non-read methods [POST]. Database rollback does not protect queues, mail, cache, filesystem writes, events, or external HTTP calls.', $preview->warnings);
     }
+}
+
+final class RoutePreviewServiceTestUser
+{
 }

@@ -6,13 +6,19 @@ namespace Oxhq\Preview\Tests\Route;
 
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Http\Client\Request;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Oxhq\Preview\Route\RoutePreviewService;
 use Oxhq\Preview\Tests\TestCase;
+use Symfony\Component\Mailer\Envelope;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\TransportInterface;
+use Symfony\Component\Mime\RawMessage;
 
 final class RoutePreviewFakeIsolationTest extends TestCase
 {
@@ -21,6 +27,7 @@ final class RoutePreviewFakeIsolationTest extends TestCase
         Carbon::setTestNow();
         RoutePreviewIsolationEventListener::$calls = 0;
         RoutePreviewIsolationJob::$handled = 0;
+        RoutePreviewIsolationMailTransport::$sent = 0;
 
         parent::tearDown();
     }
@@ -112,6 +119,47 @@ final class RoutePreviewFakeIsolationTest extends TestCase
         Queue::assertPushed(RoutePreviewIsolationJob::class);
         $this->assertSame(0, RoutePreviewIsolationJob::$handled);
     }
+
+    public function test_fake_mail_prevents_actual_mail_send_and_records_mailable_during_proxied_execution(): void
+    {
+        if (
+            ! class_exists(Mail::class)
+            || ! method_exists(Mail::class, 'fake')
+            || ! class_exists(Mailable::class)
+            || ! interface_exists(TransportInterface::class)
+        ) {
+            $this->markTestSkipped('Laravel Mail fake is unavailable in this package install.');
+        }
+
+        Carbon::setTestNow(Carbon::parse('2026-05-04 12:00:00', 'UTC'));
+        RoutePreviewIsolationMailTransport::$sent = 0;
+
+        Mail::extend('preview_isolation', fn (): RoutePreviewIsolationMailTransport => new RoutePreviewIsolationMailTransport());
+        config()->set('mail.default', 'preview_isolation');
+        config()->set('mail.mailers.preview_isolation', ['transport' => 'preview_isolation']);
+        Mail::purge('preview_isolation');
+
+        Route::get('/preview-fakes/mail', function (): string {
+            Mail::to('reviewer@example.test')->send(new RoutePreviewIsolationMailable());
+
+            return 'mail sent';
+        })->name('preview.fakes.mail');
+
+        $preview = app(RoutePreviewService::class)->preview(
+            routeName: 'preview.fakes.mail',
+            ttl: '30m',
+            fakes: ['mail'],
+        );
+
+        $this->assertSame(['mail'], $preview->fakes);
+
+        $this->get($preview->url)
+            ->assertOk()
+            ->assertSee('mail sent');
+
+        Mail::assertSent(RoutePreviewIsolationMailable::class, 'reviewer@example.test');
+        $this->assertSame(0, RoutePreviewIsolationMailTransport::$sent);
+    }
 }
 
 final class RoutePreviewIsolationEvent
@@ -135,5 +183,32 @@ final class RoutePreviewIsolationJob implements ShouldQueue
     public function handle(): void
     {
         self::$handled++;
+    }
+}
+
+final class RoutePreviewIsolationMailable extends Mailable
+{
+    public function build(): self
+    {
+        return $this
+            ->subject('Preview isolation mail')
+            ->html('Preview isolation mail body');
+    }
+}
+
+final class RoutePreviewIsolationMailTransport implements TransportInterface
+{
+    public static int $sent = 0;
+
+    public function send(RawMessage $message, ?Envelope $envelope = null): ?SentMessage
+    {
+        self::$sent++;
+
+        return new SentMessage($message, $envelope ?? Envelope::create($message));
+    }
+
+    public function __toString(): string
+    {
+        return 'preview-isolation';
     }
 }
