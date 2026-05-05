@@ -120,8 +120,10 @@ final class ScenarioReplayCommand extends Command
                 $this->line("Route output: {$content}");
             }
 
-            if (! $route->successful()) {
-                $failure ??= $this->routeFailure($route);
+            $routeFailure = $this->routeFailure($result, $route);
+
+            if ($routeFailure !== null) {
+                $failure ??= $routeFailure;
             }
         }
 
@@ -152,8 +154,10 @@ final class ScenarioReplayCommand extends Command
         }
 
         foreach ($result->routes as $route) {
-            if (! $route->successful()) {
-                return $this->routeFailure($route);
+            $failure = $this->routeFailure($result, $route);
+
+            if ($failure !== null) {
+                return $failure;
             }
         }
 
@@ -172,9 +176,42 @@ final class ScenarioReplayCommand extends Command
         );
     }
 
-    private function routeFailure(ScenarioRouteResult $route): string
+    private function routeFailure(ScenarioReplayResult $result, ScenarioRouteResult $route): ?string
     {
-        return "Scenario replay failed: route [{$route->preview->name}] returned HTTP {$route->response->getStatusCode()}.";
+        $expectation = $this->routeExpectation($result, $route);
+        $statusCode = $route->response->getStatusCode();
+
+        if ($expectation !== []) {
+            if (array_key_exists('status', $expectation) && $statusCode !== (int) $expectation['status']) {
+                return sprintf(
+                    'Scenario replay failed: route [%s] expected HTTP %d but returned HTTP %d.',
+                    $route->preview->name,
+                    (int) $expectation['status'],
+                    $statusCode,
+                );
+            }
+
+            if (array_key_exists('output_contains', $expectation)) {
+                $needle = (string) $expectation['output_contains'];
+                $output = (string) $route->response->getContent();
+
+                if (! str_contains($output, $needle)) {
+                    return sprintf(
+                        'Scenario replay failed: route [%s] output did not contain [%s].',
+                        $route->preview->name,
+                        $needle,
+                    );
+                }
+            }
+
+            return null;
+        }
+
+        if (! $route->successful()) {
+            return "Scenario replay failed: route [{$route->preview->name}] returned HTTP {$statusCode}.";
+        }
+
+        return null;
     }
 
     /**
@@ -214,19 +251,36 @@ final class ScenarioReplayCommand extends Command
             'seed' => $result->seed,
             'captures' => $captures,
             'dispatches' => $dispatches,
-            'routes' => array_map(fn (ScenarioRouteResult $route): array => [
-                'name' => $route->preview->name,
-                'uri' => $route->preview->uri,
-                'method' => $route->preview->executionMethod,
-                'url' => $route->preview->url,
-                'status_code' => $route->response->getStatusCode(),
-                'output' => trim((string) $route->response->getContent()),
-                'successful' => $route->successful(),
-            ], $result->routes),
+            'routes' => array_map(function (ScenarioRouteResult $route) use ($result): array {
+                $expectation = $this->routeExpectation($result, $route);
+                $failure = $this->routeFailure($result, $route);
+
+                return [
+                    'name' => $route->preview->name,
+                    'uri' => $route->preview->uri,
+                    'method' => $route->preview->executionMethod,
+                    'url' => $route->preview->url,
+                    'status_code' => $route->response->getStatusCode(),
+                    'output' => trim((string) $route->response->getContent()),
+                    'successful' => $failure === null,
+                    'expectation' => $expectation === [] ? null : $expectation,
+                    'expectation_failure' => $failure,
+                ];
+            }, $result->routes),
             'summary' => $result->summaryCounts(),
             'successful' => $failure === null,
             'failure' => $failure,
         ];
+    }
+
+    /**
+     * @return array{status?: int, output_contains?: string}
+     */
+    private function routeExpectation(ScenarioReplayResult $result, ScenarioRouteResult $route): array
+    {
+        $expectation = $result->scenario->routeExpectations[$route->preview->name] ?? [];
+
+        return is_array($expectation) ? $expectation : [];
     }
 
     /**

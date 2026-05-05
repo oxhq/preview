@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Oxhq\Preview\Commands;
 
 use Illuminate\Console\Command;
+use Oxhq\Preview\Scenario\Scenario;
 use Oxhq\Preview\Scenario\ScenarioRepository;
 use RuntimeException;
 
 final class ScenarioShowCommand extends Command
 {
-    protected $signature = 'preview:scenario:show {scenario : Scenario name}';
+    protected $signature = 'preview:scenario:show {scenario : Scenario name} {--json : Output scenario diagnostics as JSON}';
 
     protected $description = 'Show a local Laravel Preview scenario.';
 
@@ -38,18 +39,43 @@ final class ScenarioShowCommand extends Command
             return self::FAILURE;
         }
 
+        if ((bool) $this->option('json')) {
+            $this->line(json_encode($this->scenarioData($scenario), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+            return self::SUCCESS;
+        }
+
         $this->line("Scenario: {$scenario->name}");
         $this->line('Seed: '.($scenario->seed ?? 'none'));
         $this->line(sprintf('Routes (%d): %s', count($scenario->routes), $this->formatList($scenario->routes)));
         $this->line(sprintf('Captures (%d): %s', count($scenario->captures), $this->formatList($scenario->captures)));
         $this->line(sprintf('Fakes (%d): %s', count($scenario->fakes), $this->formatList($scenario->fakes)));
         $this->printRouteContext($scenario->routeContext);
+        $this->printRouteExpectations($scenario->routeExpectations);
 
         if ($scenario->notes !== null && trim($scenario->notes) !== '') {
             $this->line('Notes: '.$scenario->notes);
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @return array{name: string, seed: ?string, routes: list<string>, routeParameters: array<string, array<string, string>>, routeContext: array<string, array{session?: array<string, string>, guard?: string, user_id?: string, user_model?: class-string|string, readonly_db?: bool, fakes?: list<string>}>, routeExpectations: array<string, array{status: int, output_contains?: string}>, captures: list<string>, fakes: list<string>, notes: ?string}
+     */
+    private function scenarioData(Scenario $scenario): array
+    {
+        return [
+            'name' => $scenario->name,
+            'seed' => $scenario->seed,
+            'routes' => $scenario->routes,
+            'routeParameters' => $scenario->routeParameters,
+            'routeContext' => $scenario->routeContext,
+            'routeExpectations' => $scenario->routeExpectations,
+            'captures' => $scenario->captures,
+            'fakes' => $scenario->fakes,
+            'notes' => $scenario->notes,
+        ];
     }
 
     /**
@@ -89,6 +115,31 @@ final class ScenarioShowCommand extends Command
                 $this->formatUser($context),
                 ($context['readonly_db'] ?? false) ? 'requested' : 'not requested',
                 $this->formatList($this->sortedList($context['fakes'] ?? [])),
+            ));
+        }
+    }
+
+    /**
+     * @param array<string, array{status: int, output_contains?: string}> $routeExpectations
+     */
+    private function printRouteExpectations(array $routeExpectations): void
+    {
+        $routeExpectations = array_filter($routeExpectations);
+
+        if ($routeExpectations === []) {
+            return;
+        }
+
+        ksort($routeExpectations);
+
+        $this->line(sprintf('Route expectations (%d):', count($routeExpectations)));
+
+        foreach ($routeExpectations as $route => $expectation) {
+            $this->line(sprintf(
+                ' - %s: status %d; output contains: %s',
+                $route,
+                $expectation['status'],
+                $expectation['output_contains'] ?? 'none',
             ));
         }
     }

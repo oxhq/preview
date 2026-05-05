@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Oxhq\Preview\Tests\Commands;
 
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -174,6 +175,95 @@ PHP);
             ->assertExitCode(1);
     }
 
+    public function test_preview_scenario_replay_fails_when_route_status_expectation_differs(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+
+        Route::get('/scenario-command/expected-status', fn () => response('accepted', 204))
+            ->name('preview.scenario-command.expected-status');
+
+        $this->writeScenario($path, 'expected-status.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'expected-status',
+    routes: ['preview.scenario-command.expected-status'],
+    routeExpectations: [
+        'preview.scenario-command.expected-status' => [
+            'status' => 201,
+        ],
+    ],
+);
+PHP);
+
+        $this->artisan('preview:scenario:replay', [
+            'scenario' => 'expected-status',
+            '--exact' => true,
+        ])
+            ->expectsOutput('Scenario replay ready for [expected-status] using [exact].')
+            ->expectsOutput('Captures: none')
+            ->expectsOutput('Route: preview.scenario-command.expected-status HTTP 204')
+            ->expectsOutput('Summary: seed=0 captures=0 dispatches=0 routes=1')
+            ->expectsOutput('Scenario replay failed: route [preview.scenario-command.expected-status] expected HTTP 201 but returned HTTP 204.')
+            ->assertExitCode(1);
+    }
+
+    public function test_preview_scenario_replay_json_includes_failed_route_expectation_details(): void
+    {
+        $path = $this->scenarioPath();
+        $this->app['config']->set('preview.scenario_path', $path);
+
+        Route::get('/scenario-command/expected-output', fn () => 'checkout complete')
+            ->name('preview.scenario-command.expected-output');
+
+        $this->writeScenario($path, 'expected-output.php', <<<'PHP'
+<?php
+
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'expected-output',
+    routes: ['preview.scenario-command.expected-output'],
+    routeExpectations: [
+        'preview.scenario-command.expected-output' => [
+            'status' => 200,
+            'output_contains' => 'queued',
+        ],
+    ],
+);
+PHP);
+
+        [$exitCode, $output] = $this->runReplayJson([
+            'scenario' => 'expected-output',
+            '--exact' => true,
+            '--json' => true,
+        ]);
+
+        $payload = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertFalse($payload['successful']);
+        $this->assertSame(
+            'Scenario replay failed: route [preview.scenario-command.expected-output] output did not contain [queued].',
+            $payload['failure'],
+        );
+        $this->assertSame('preview.scenario-command.expected-output', $payload['routes'][0]['name']);
+        $this->assertSame(200, $payload['routes'][0]['status_code']);
+        $this->assertSame('checkout complete', $payload['routes'][0]['output']);
+        $this->assertFalse($payload['routes'][0]['successful']);
+        $this->assertSame([
+            'status' => 200,
+            'output_contains' => 'queued',
+        ], $payload['routes'][0]['expectation']);
+        $this->assertSame(
+            'Scenario replay failed: route [preview.scenario-command.expected-output] output did not contain [queued].',
+            $payload['routes'][0]['expectation_failure'],
+        );
+    }
+
     private function scenarioPath(): string
     {
         return sys_get_temp_dir().'/preview-tests/scenarios/'.spl_object_id($this);
@@ -207,5 +297,17 @@ PHP);
             $table->increments('id');
             $table->string('message');
         });
+    }
+
+    /**
+     * @param array<string, mixed> $parameters
+     * @return array{0: int, 1: string}
+     */
+    private function runReplayJson(array $parameters): array
+    {
+        $output = new \Symfony\Component\Console\Output\BufferedOutput();
+        $exitCode = $this->app->make(Kernel::class)->call('preview:scenario:replay', $parameters, $output);
+
+        return [$exitCode, $output->fetch()];
     }
 }

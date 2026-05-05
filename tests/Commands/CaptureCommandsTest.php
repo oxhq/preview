@@ -255,6 +255,66 @@ final class CaptureCommandsTest extends TestCase
             ->assertExitCode(0);
     }
 
+    public function test_capture_fixture_json_outputs_generated_fixture_metadata_without_body_or_secrets(): void
+    {
+        $this->artisan('preview:capture', [
+            'provider' => 'generic',
+            '--path' => '/webhooks/orders',
+            '--body' => '{"id":1}',
+            '--header' => ['X-Preview-Event: order.created', 'Authorization: Bearer fixture-secret'],
+        ])->assertExitCode(0);
+
+        $record = app(CaptureRepository::class)->all()[0];
+        $exitCode = Artisan::call('preview:capture:fixture', [
+            'capture' => $record->id,
+            '--json' => true,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame($record->id, $payload['id']);
+        $this->assertSame('generic', $payload['provider']);
+        $this->assertSame(str_replace('\\', '/', sys_get_temp_dir()).'/preview-tests/fixtures/generic/order.created/fixture.php', str_replace('\\', '/', $payload['fixture_path']));
+        $this->assertFalse($payload['can_sign']);
+        $this->assertArrayNotHasKey('raw_body', $payload);
+        $this->assertStringNotContainsString('fixture-secret', Artisan::output());
+        $this->assertStringNotContainsString('{"id":1}', Artisan::output());
+    }
+
+    public function test_capture_test_json_outputs_generated_test_metadata_and_signing_support(): void
+    {
+        $body = '{"event":"created"}';
+        $signature = hash_hmac('sha256', $body, 'test-secret');
+
+        $this->artisan('preview:capture', [
+            'provider' => 'hmac',
+            '--signature-header' => 'X-Custom-Signature',
+            '--path' => '/webhooks/signed',
+            '--body' => $body,
+            '--header' => ['X-Custom-Signature: '.$signature, 'Authorization: Bearer test-secret-value'],
+        ])->assertExitCode(0);
+
+        $record = app(CaptureRepository::class)->all()[0];
+        $exitCode = Artisan::call('preview:capture:test', [
+            'capture' => $record->id,
+            '--json' => true,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame($record->id, $payload['id']);
+        $this->assertSame('hmac', $payload['provider']);
+        $this->assertSame(str_replace('\\', '/', sys_get_temp_dir()).'/preview-tests/tests/Preview/hmac-generic-captureTest.php', str_replace('\\', '/', $payload['test_path']));
+        $this->assertTrue($payload['can_sign']);
+        $this->assertArrayNotHasKey('raw_body', $payload);
+        $this->assertStringNotContainsString('test-secret-value', Artisan::output());
+        $this->assertStringNotContainsString($body, Artisan::output());
+    }
+
     public function test_capture_list_json_outputs_redacted_capture_summaries(): void
     {
         $this->artisan('preview:capture', [

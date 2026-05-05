@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Oxhq\Preview\Tests\Capture;
 
+use DateTimeImmutable;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\PreviewRequest;
 use Oxhq\Preview\Core\RedactionPolicy;
@@ -75,6 +76,55 @@ final class CaptureRepositoryTest extends TestCase
             'signature_header' => 'X-Custom-Signature',
             'algorithm' => 'sha512',
         ], $repository->find($record->id)->metadata['fixture_context']);
+    }
+
+    public function test_it_prunes_captures_older_than_the_cutoff(): void
+    {
+        $root = sys_get_temp_dir().'/preview-captures-'.bin2hex(random_bytes(4));
+        $repository = new CaptureRepository($root);
+        $provider = new GenericProvider();
+
+        $old = $repository->store(
+            new PreviewRequest('generic', 'POST', '/old', [], [], '{}', new DateTimeImmutable('2025-12-31T23:59:59+00:00')),
+            $provider,
+        );
+        $onCutoff = $repository->store(
+            new PreviewRequest('generic', 'POST', '/cutoff', [], [], '{}', new DateTimeImmutable('2026-01-01T00:00:00+00:00')),
+            $provider,
+        );
+        $new = $repository->store(
+            new PreviewRequest('generic', 'POST', '/new', [], [], '{}', new DateTimeImmutable('2026-01-02T00:00:00+00:00')),
+            $provider,
+        );
+
+        $pruned = $repository->pruneBefore(new DateTimeImmutable('2026-01-01T00:00:00+00:00'));
+
+        $this->assertSame([$old->id], array_map(fn ($record): string => $record->id, $pruned));
+        $this->assertDirectoryDoesNotExist($root.'/'.$old->id);
+        $this->assertDirectoryExists($root.'/'.$onCutoff->id);
+        $this->assertDirectoryExists($root.'/'.$new->id);
+    }
+
+    public function test_dry_run_prune_lists_matching_captures_without_deleting(): void
+    {
+        $root = sys_get_temp_dir().'/preview-captures-'.bin2hex(random_bytes(4));
+        $repository = new CaptureRepository($root);
+        $provider = new GenericProvider();
+
+        $old = $repository->store(
+            new PreviewRequest('generic', 'POST', '/old', [], [], '{}', new DateTimeImmutable('2025-12-31T23:59:59+00:00')),
+            $provider,
+        );
+        $repository->store(
+            new PreviewRequest('generic', 'POST', '/new', [], [], '{}', new DateTimeImmutable('2026-01-02T00:00:00+00:00')),
+            $provider,
+        );
+
+        $pruned = $repository->pruneBefore(new DateTimeImmutable('2026-01-01T00:00:00+00:00'), dryRun: true);
+
+        $this->assertSame([$old->id], array_map(fn ($record): string => $record->id, $pruned));
+        $this->assertDirectoryExists($root.'/'.$old->id);
+        $this->assertCount(2, $repository->all());
     }
 
     public function test_it_appends_gitignore_rule_for_capture_storage_inside_git_root(): void

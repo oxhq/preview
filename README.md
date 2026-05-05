@@ -102,11 +102,18 @@ php artisan preview:capture:replay {capture} --exact
 php artisan preview:capture:replay {capture} --exact --json
 php artisan preview:capture:replay {capture} --resign
 php artisan preview:capture:fixture {capture}
+php artisan preview:capture:fixture {capture} --json
 php artisan preview:capture:test {capture}
+php artisan preview:capture:test {capture} --json
+php artisan preview:capture:prune --before=2026-05-01 --dry-run
+php artisan preview:capture:prune --before=2026-05-01
 ```
 
 Raw captures stay local. Metadata and generated fixtures redact configured sensitive
 headers such as cookies and authorization values.
+Capture pruning requires an explicit date cutoff and only deletes directories resolved
+inside the configured capture storage root. Use `--dry-run` first when inspecting local
+state.
 
 `stripe-cli` is an optional convenience transport. It starts `stripe listen` and forwards
 Stripe events to the local Preview Stripe capture endpoint. It still requires `--live`,
@@ -117,7 +124,12 @@ Inspect configured tunnel transports without opening a tunnel:
 ```bash
 php artisan preview:transport:list
 php artisan preview:transport:list --json
+php artisan preview:transport:doctor
+php artisan preview:transport:doctor --json
 ```
+
+`preview:transport:doctor` checks configured transport binaries without opening tunnels
+or touching the network.
 
 ## Route Preview
 
@@ -203,7 +215,9 @@ php artisan preview:scenario:make subscription-renewal \
   --route-output-contains="billing.portal=Billing"
 
 php artisan preview:scenario:list
+php artisan preview:scenario:list --json
 php artisan preview:scenario:show subscription-renewal
+php artisan preview:scenario:show subscription-renewal --json
 php artisan preview:scenario:replay subscription-renewal --exact
 php artisan preview:scenario:replay subscription-renewal --exact --json
 php artisan preview:scenario:replay subscription-renewal --resign
@@ -216,6 +230,9 @@ routes through the same signed route-preview safety layer. Replay prints a summa
 seed, capture, dispatch, and route counts, and failures include the failing dispatch or
 route when a partial result exists. Scenario fakes are forwarded to route preview; they do
 not provide broader isolation than the route-preview fake flags.
+Configured route expectations are enforced during replay, so a route that returns the
+wrong status or misses required response text fails the replay even if the response is
+otherwise a 2xx.
 
 Generated scenario tests are Pest-compatible and local-first. They are meant to fail
 clearly when the host app lacks required routes, models, provider secrets, seed data, or

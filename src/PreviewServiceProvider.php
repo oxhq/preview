@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Oxhq\Preview\Commands\CaptureCommand;
 use Oxhq\Preview\Commands\CaptureFixtureCommand;
 use Oxhq\Preview\Commands\CaptureListCommand;
+use Oxhq\Preview\Commands\CapturePruneCommand;
 use Oxhq\Preview\Commands\CaptureReplayCommand;
 use Oxhq\Preview\Commands\CaptureShowCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
@@ -19,6 +20,7 @@ use Oxhq\Preview\Commands\ScenarioMakeCommand;
 use Oxhq\Preview\Commands\ScenarioReplayCommand;
 use Oxhq\Preview\Commands\ScenarioShowCommand;
 use Oxhq\Preview\Commands\ScenarioTestCommand;
+use Oxhq\Preview\Commands\TransportDoctorCommand;
 use Oxhq\Preview\Commands\TransportListCommand;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
@@ -187,6 +189,7 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureCommand::class,
                 CaptureFixtureCommand::class,
                 CaptureListCommand::class,
+                CapturePruneCommand::class,
                 CaptureReplayCommand::class,
                 CaptureShowCommand::class,
                 CaptureTestCommand::class,
@@ -197,6 +200,7 @@ class PreviewServiceProvider extends ServiceProvider
                 ScenarioReplayCommand::class,
                 ScenarioShowCommand::class,
                 ScenarioTestCommand::class,
+                TransportDoctorCommand::class,
                 TransportListCommand::class,
             ]);
         }
