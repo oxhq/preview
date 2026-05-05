@@ -34,8 +34,9 @@ final class ProcessTunnelTransportTest extends TestCase
         $process = new FakeTransportProcess(
             output: '2026-05-02 INF Your quick Tunnel has been created! https://preview-demo.trycloudflare.com',
         );
+        $factory = new RecordingProcessFactory($process);
         $transport = new CloudflareTunnelTransport(
-            new RecordingProcessFactory($process)(...),
+            $factory(...),
             urlTimeoutSeconds: 0.01,
             pollIntervalMicroseconds: 1,
         );
@@ -53,9 +54,10 @@ final class ProcessTunnelTransportTest extends TestCase
             output: '2026-05-02 INF Your quick Tunnel has been created! https://preview-demo.trycloudflare.com 2026-05-02 INF Registered tunnel connection',
             delaySeconds: 2.2,
         );
+        $factory = new RecordingProcessFactory($process);
 
         $transport = new CloudflareTunnelTransport(
-            new RecordingProcessFactory($process)(...),
+            $factory(...),
             pollIntervalMicroseconds: 50_000,
         );
 
@@ -81,8 +83,9 @@ final class ProcessTunnelTransportTest extends TestCase
     public function test_open_throws_when_no_public_url_appears_before_timeout(): void
     {
         $process = new FakeTransportProcess(output: 'starting tunnel without url');
+        $factory = new RecordingProcessFactory($process);
         $transport = new CloudflareTunnelTransport(
-            new RecordingProcessFactory($process)(...),
+            $factory(...),
             urlTimeoutSeconds: 0.01,
             pollIntervalMicroseconds: 1,
         );
@@ -99,7 +102,8 @@ final class ProcessTunnelTransportTest extends TestCase
         $process = new FakeTransportProcess(
             output: 'Forwarding https://abc-123.ngrok-free.app -> http://localhost:8000',
         );
-        $transport = new NgrokTunnelTransport(new RecordingProcessFactory($process)(...), urlTimeoutSeconds: 0.1);
+        $factory = new RecordingProcessFactory($process);
+        $transport = new NgrokTunnelTransport($factory(...), urlTimeoutSeconds: 0.1);
 
         $handle = $transport->open('http://localhost:8000');
         $transport->close($handle);

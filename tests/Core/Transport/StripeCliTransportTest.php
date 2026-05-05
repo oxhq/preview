@@ -55,8 +55,9 @@ final class StripeCliTransportTest extends TestCase
 
     public function test_stripe_cli_transport_rejects_missing_local_url(): void
     {
+        $factory = new StripeRecordingProcessFactory(new StripeFakeTransportProcess());
         $transport = new StripeCliTunnelTransport(
-            processFactory: new StripeRecordingProcessFactory(new StripeFakeTransportProcess())(...),
+            processFactory: $factory(...),
         );
 
         $this->expectException(InvalidArgumentException::class);
@@ -70,8 +71,9 @@ final class StripeCliTransportTest extends TestCase
         $process = new StripeFakeTransportProcess(
             startException: new RuntimeException('The system cannot find the file specified.'),
         );
+        $factory = new StripeRecordingProcessFactory($process);
         $transport = new StripeCliTunnelTransport(
-            processFactory: new StripeRecordingProcessFactory($process)(...),
+            processFactory: $factory(...),
             binary: 'C:\\Missing\\stripe.exe',
         );
 
