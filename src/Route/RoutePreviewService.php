@@ -20,6 +20,7 @@ final class RoutePreviewService
 
     /**
      * @param array<string, string> $parameters
+     * @param array<string, string|mixed> $session
      */
     public function preview(
         string $routeName,
@@ -27,6 +28,7 @@ final class RoutePreviewService
         string $ttl = '2h',
         bool $readonlyDb = false,
         ?string $guard = null,
+        array $session = [],
         bool $allowWrite = false,
         array $fakes = [],
     ): RoutePreview {
@@ -52,12 +54,17 @@ final class RoutePreviewService
         $expiresAt = $this->expiresAt($ttl);
         $middleware = array_values(array_map('strval', $route->gatherMiddleware()));
         $executionMethod = $this->executionMethod($methods, $allowWrite);
+        $session = $this->normalizeStringMap($session);
         $fakes = $this->normalizeFakes($fakes);
         $query = [
             'route' => $routeName,
             '_preview_params' => $this->encodeParameters($parameters),
             '_preview_method' => $executionMethod,
         ];
+
+        if ($session !== []) {
+            $query['_preview_session'] = $this->encodeParameters($session);
+        }
 
         if ($allowWrite) {
             $query['_preview_allow_write'] = '1';
@@ -92,6 +99,10 @@ final class RoutePreviewService
             $warnings[] = sprintf('Guard [%s] is recorded on the preview link; it does not bypass application authorization.', trim($guard));
         }
 
+        if ($session !== []) {
+            $warnings[] = 'Session context is attached to the proxied request; it does not authenticate a user or bypass authorization.';
+        }
+
         foreach ($fakes as $fake) {
             $warnings[] = "Preview will request fake [{$fake}] during proxied execution.";
         }
@@ -107,6 +118,7 @@ final class RoutePreviewService
             url: $this->url->temporarySignedRoute('preview.route.access', $expiresAt, $query),
             expiresAt: $expiresAt,
             parameters: $parameters,
+            session: $session,
             readonlyDb: $readonlyDb,
             guard: $guard !== null && trim($guard) !== '' ? trim($guard) : null,
             fakes: $fakes,
@@ -182,6 +194,25 @@ final class RoutePreviewService
         }
 
         return array_values(array_unique($normalized));
+    }
+
+    /**
+     * @param array<string, string|mixed> $values
+     * @return array<string, string>
+     */
+    private function normalizeStringMap(array $values): array
+    {
+        $normalized = [];
+
+        foreach ($values as $key => $value) {
+            if (! is_string($key) || $key === '' || ! is_scalar($value)) {
+                continue;
+            }
+
+            $normalized[$key] = (string) $value;
+        }
+
+        return $normalized;
     }
 
     private function expiresAt(string $ttl): DateTimeImmutable

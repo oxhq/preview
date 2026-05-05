@@ -59,7 +59,7 @@ Laravel Preview should know and preserve Laravel-specific context:
 - provider signatures
 - named endpoints and routes
 - middleware behavior
-- guard/session context where applicable
+- request metadata and session context where applicable
 - Pest testing conventions
 - local fixture storage
 - queue, mail, event, and HTTP fake boundaries in later phases
@@ -376,13 +376,13 @@ Trust is part of the product. "Local-first" must be enforced by behavior, not on
 The route preview command generates signed, time-limited access to a named Laravel route:
 
 ```bash
-php artisan preview:route {route} --ttl=2h --param=id=123 --readonly-db --guard=client
+php artisan preview:route {route} --ttl=2h --param=id=123 --session=currency=usd --readonly-db --guard=client
 ```
 
 Example:
 
 ```bash
-php artisan preview:route billing.portal --ttl=2h --param=id=123 --readonly-db --guard=client
+php artisan preview:route billing.portal --ttl=2h --param=id=123 --session=currency=usd --readonly-db --guard=client
 ```
 
 Use `--readonly-db`, not `--readonly`.
@@ -393,18 +393,23 @@ v0.3 route preview scope:
 - middleware summary
 - TTL signed access links
 - route parameters from repeated `--param=key=value` flags
+- session context from repeated `--session=key=value` flags, carried into the proxied preview request
 - required, optional, and domain parameter validation
 - guard context recorded as request metadata through `--guard`
 - default blocking for routes that do not allow `GET` or `HEAD`
 - explicit opt-in before non-`GET`/`HEAD` routes can be exposed
 - proxied execution of the named route through the signed preview link
 - `--readonly-db` transaction rollback for covered database writes inside the wrapped request
-- side-effect fake flags for supported queue, mail, HTTP, and event behavior
+- behavior-tested side-effect fake flags for supported queue, mail, HTTP, and event facades
 - expiry, signature, parameter, warning, and audit-output tests
 
 `--readonly-db` is not a complete read-only guarantee. It only covers database writes performed inside the wrapped preview request transaction.
 
 Database transaction rollback does not protect queues, mail, cache, filesystem writes, external HTTP calls, or events unless the specific side effect is covered by an explicit fake flag.
+
+`--guard` does not impersonate an authenticated user or switch Laravel guards in v0.3. It is preserved as preview request metadata for auditability until a later app-specific impersonation design exists.
+
+Route preview does not provide filesystem isolation or cache isolation.
 
 Safety flags:
 

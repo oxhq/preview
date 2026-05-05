@@ -105,6 +105,63 @@ final class RoutePreviewHardeningTest extends TestCase
             ->assertSee('invoice:inv_123');
     }
 
+    public function test_signed_preview_link_carries_session_context_into_proxied_request(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-04 12:00:00', 'UTC'));
+
+        Route::get('/session-context', fn () => response()->json([
+            'tenant' => session('tenant'),
+            'mode' => request()->attributes->get('preview.session')['mode'] ?? null,
+            'guard' => request()->attributes->get('preview.guard'),
+        ]))->name('preview.session-context');
+
+        $preview = app(RoutePreviewService::class)->preview(
+            routeName: 'preview.session-context',
+            ttl: '30m',
+            guard: 'client',
+            session: [
+                'tenant' => 'acme',
+                'mode' => 'review',
+            ],
+        );
+
+        $this->assertSame([
+            'tenant' => 'acme',
+            'mode' => 'review',
+        ], $preview->session);
+        $this->assertStringContainsString('_preview_session=', $preview->url);
+
+        $this->get($preview->url)
+            ->assertOk()
+            ->assertJson([
+                'tenant' => 'acme',
+                'mode' => 'review',
+                'guard' => 'client',
+            ]);
+    }
+
+    public function test_preview_route_command_prints_session_context_without_claiming_impersonation(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-04 12:00:00', 'UTC'));
+
+        Route::get('/session-audit', fn (): string => 'ok')
+            ->name('preview.session-audit');
+
+        $this->artisan('preview:route', [
+            'route' => 'preview.session-audit',
+            '--ttl' => '30m',
+            '--guard' => 'client',
+            '--session' => ['tenant=acme', 'mode=review'],
+        ])
+            ->expectsOutput('Guard: client')
+            ->expectsOutput('Session: tenant=acme, mode=review')
+            ->expectsOutput('Warnings:')
+            ->expectsOutput(' - Guard [client] is recorded on the preview link; it does not bypass application authorization.')
+            ->expectsOutput(' - Session context is attached to the proxied request; it does not authenticate a user or bypass authorization.')
+            ->doesntExpectOutput('Impersonation: enabled')
+            ->assertExitCode(0);
+    }
+
     public function test_readonly_db_rolls_back_database_writes_in_proxied_request(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-04 12:00:00', 'UTC'));

@@ -14,6 +14,7 @@ final class RoutePreviewCommand extends Command
         {route : Named Laravel route to preview}
         {--ttl=2h : Signed preview link lifetime, such as 30m, 2h, or 1d}
         {--param=* : Route parameter as "name=value"; may be repeated}
+        {--session=* : Session value as "name=value"; may be repeated}
         {--readonly-db : Mark the link with database-readonly intent and print safety warnings}
         {--guard= : Guard/session context label to record on the preview link}
         {--allow-write : Explicitly allow non-GET/HEAD routes}
@@ -39,6 +40,7 @@ final class RoutePreviewCommand extends Command
                 ttl: (string) $this->option('ttl'),
                 readonlyDb: (bool) $this->option('readonly-db'),
                 guard: is_string($this->option('guard')) ? (string) $this->option('guard') : null,
+                session: $this->keyValueOptions((array) $this->option('session')),
                 allowWrite: (bool) $this->option('allow-write'),
                 fakes: $this->fakes(),
             );
@@ -65,6 +67,10 @@ final class RoutePreviewCommand extends Command
 
         if ($preview->guard !== null) {
             $this->line("Guard: {$preview->guard}");
+        }
+
+        if ($preview->session !== []) {
+            $this->line('Session: '.$this->formatParameters($preview->session));
         }
 
         if ($preview->fakes !== []) {
@@ -103,6 +109,15 @@ final class RoutePreviewCommand extends Command
      * @return array<string, string>
      */
     private function parameters(array $values): array
+    {
+        return $this->keyValueOptions($values);
+    }
+
+    /**
+     * @param list<string> $values
+     * @return array<string, string>
+     */
+    private function keyValueOptions(array $values): array
     {
         $parameters = [];
 

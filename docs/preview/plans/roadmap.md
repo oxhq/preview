@@ -74,7 +74,7 @@ Goal: expose Laravel routes with Laravel-aware safety and context.
 CLI target:
 
 ```bash
-php artisan preview:route {route} --ttl=2h --param=id=123 --readonly-db --guard=client
+php artisan preview:route {route} --ttl=2h --param=id=123 --session=currency=usd --readonly-db --guard=client
 ```
 
 v0.3 now splits into two parallel route-preview slices.
@@ -85,12 +85,13 @@ Slice A: signed proxy execution and safety controls:
 - middleware summary
 - TTL signed access links
 - route params through repeated `--param=key=value`
+- session context through repeated `--session=key=value`, carried into the proxied preview request
 - guard context carried as request metadata
 - default blocking of routes that do not allow `GET` or `HEAD`
 - explicit non-read method opt-in
 - proxy execution of the named route through the signed preview link
 - `--readonly-db` transaction wrapper for covered database writes
-- side-effect fake flags for supported queue, mail, HTTP, and event behavior
+- behavior-tested side-effect fake flags for supported queue, mail, HTTP, and event facades
 
 Slice B: parameter, signature, warning, and audit hardening:
 
@@ -99,9 +100,13 @@ Slice B: parameter, signature, warning, and audit hardening:
 - domain parameter handling
 - expiry and signature tests
 - clearer warnings for uncovered side effects and unsafe methods
-- audit output for route, method, params, guard metadata, TTL, safety flags, and execution mode
+- audit output for route, method, params, session context keys, guard metadata, TTL, safety flags, and execution mode
 
 Do not call it `--readonly`. `--readonly-db` is not a complete read-only guarantee: it only covers database writes inside the wrapped preview request. It does not cover queues, mail, cache, filesystem writes, external HTTP calls, or events unless explicit fake flags are used for the side effects the package supports.
+
+`--guard` remains request metadata in v0.3. Do not claim full auth, guard switching, or user impersonation unless a later app-specific impersonation slice exists and is tested.
+
+Route preview does not provide filesystem isolation or cache isolation.
 
 Safety flags:
 

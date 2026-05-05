@@ -11,7 +11,7 @@ It is not a tunnel product or a hosted request bin. Tunnels get traffic to your 
 - Stores redacted capture metadata locally by default.
 - Verifies and re-signs provider traffic through provider adapters.
 - Generates fixture files and Pest-compatible test files from captures.
-- Supports safe route preview for signed, time-limited route links with guarded execution controls.
+- Supports safe route preview for signed, time-limited route links with explicit safety controls.
 
 ## Supported Providers
 
@@ -98,6 +98,7 @@ php artisan preview:capture:test {capture}
 php artisan preview:route billing.portal \
   --ttl=2h \
   --param=id=123 \
+  --session=currency=usd \
   --readonly-db \
   --guard=client \
   --fake-queue \
@@ -107,6 +108,8 @@ php artisan preview:route billing.portal \
 Route preview creates signed, time-limited links for named Laravel routes and proxies execution through the signed preview endpoint. Explicit opt-in is required before non-read methods are exposed.
 
 `--readonly-db` wraps the covered request in a database transaction so database writes can be rolled back. It is not a complete read-only guarantee: queues, mail, cache, filesystem writes, external HTTP, and events are outside that database wrapper unless explicit fake flags are used for the side effects the package supports.
+
+Repeated `--session=key=value` flags carry session context into the proxied preview request. `--guard` is request metadata only; route preview does not implement full auth impersonation, filesystem isolation, or cache isolation.
 
 ## Current Proof Boundary
 

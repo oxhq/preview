@@ -12,6 +12,7 @@ final class RoutePreview
      * @param list<string> $methods
      * @param list<string> $middleware
      * @param array<string, string> $parameters
+     * @param array<string, string> $session
      * @param list<string> $fakes
      * @param list<string> $warnings
      */
@@ -26,6 +27,7 @@ final class RoutePreview
         public readonly string $url,
         public readonly DateTimeImmutable $expiresAt,
         public readonly array $parameters = [],
+        public readonly array $session = [],
         public readonly bool $readonlyDb = false,
         public readonly ?string $guard = null,
         public readonly array $fakes = [],
