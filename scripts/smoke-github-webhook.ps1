@@ -2,6 +2,8 @@
 param(
     [string] $Repo = 'oxhq/preview',
 
+    [string[]] $Event = @('ping'),
+
     [ValidateSet('cloudflare')]
     [string] $Transport = 'cloudflare',
 
@@ -19,7 +21,9 @@ param(
 
     [switch] $KeepWorkDir,
 
-    [switch] $RequireDns
+    [switch] $RequireDns,
+
+    [switch] $DryRun
 )
 
 Set-StrictMode -Version Latest
@@ -370,11 +374,48 @@ function New-WebhookSecret {
 }
 
 function Get-MatchingCapture {
-    param([AllowNull()][object] $Captures)
+    param(
+        [AllowNull()]
+        [object] $Captures,
+
+        [Parameter(Mandatory = $true)]
+        [string] $EventType
+    )
 
     return @($Captures | Where-Object {
-        $_.provider -eq 'github' -and $_.event_type -eq 'ping' -and $_.verified -eq $true
+        $_.provider -eq 'github' -and $_.event_type -eq $EventType -and $_.verified -eq $true
     }) | Select-Object -First 1
+}
+
+function Get-UniqueGitHubEvents {
+    param([Parameter(Mandatory = $true)][string[]] $Events)
+
+    $allowed = @('ping', 'push', 'pull_request')
+    $unique = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($eventValue in $Events) {
+        foreach ($eventName in ($eventValue -split ',')) {
+            $normalized = $eventName.Trim()
+
+            if ([string]::IsNullOrWhiteSpace($normalized)) {
+                continue
+            }
+
+            if ($normalized -notin $allowed) {
+                Write-Failure "Unsupported GitHub proof event [$normalized]. Use one of: $($allowed -join ', ')."
+            }
+
+            if (-not $unique.Contains($normalized)) {
+                $unique.Add($normalized)
+            }
+        }
+    }
+
+    if ($unique.Count -eq 0) {
+        Write-Failure 'At least one GitHub proof event is required.'
+    }
+
+    return @($unique)
 }
 
 $scriptRoot = if ($PSScriptRoot -ne '') {
@@ -392,6 +433,13 @@ $testbench = Join-Path $resolvedPackageRoot 'vendor/bin/testbench'
 $serverJob = $null
 $tunnelJob = $null
 $hookId = $null
+$requestedEvents = Get-UniqueGitHubEvents -Events $Event
+$hookEvents = @($requestedEvents | Where-Object { $_ -ne 'ping' })
+
+if ($hookEvents.Count -eq 0) {
+    $hookEvents = @('push')
+}
+
 $webhookSecret = New-WebhookSecret
 $storagePathWasProvided = -not [string]::IsNullOrWhiteSpace($StoragePath)
 $workDir = Join-Path ([System.IO.Path]::GetTempPath()) ('preview-github-webhook-smoke-' + [Guid]::NewGuid().ToString('N'))
@@ -409,6 +457,31 @@ $previousGithubSecret = [Environment]::GetEnvironmentVariable('PREVIEW_GITHUB_WE
 $previousCloudflaredBinary = [Environment]::GetEnvironmentVariable('PREVIEW_CLOUDFLARED_BINARY', 'Process')
 
 try {
+    try {
+        $localUri = [Uri] $LocalUrl
+    } catch {
+        Write-Failure "LocalUrl [$LocalUrl] is not a valid URL."
+    }
+
+    if ($localUri.Scheme -notin @('http', 'https')) {
+        Write-Failure "LocalUrl [$LocalUrl] must use http or https."
+    }
+
+    if ($DryRun.IsPresent) {
+        Write-Smoke 'Dry run only; no tunnel, GitHub API request, or webhook delivery will be attempted.'
+        Write-Smoke "Repo: $Repo"
+        Write-Smoke "Requested proof events: $($requestedEvents -join ', ')"
+        Write-Smoke "Temporary hook subscription events: $($hookEvents -join ', ')"
+        Write-Smoke 'ping proof uses POST /repos/{owner}/{repo}/hooks/{hook_id}/pings.'
+        Write-Smoke 'push proof uses POST /repos/{owner}/{repo}/hooks/{hook_id}/tests.'
+
+        if ($requestedEvents -contains 'pull_request') {
+            Write-Smoke 'pull_request proof is wait-only: GitHub does not expose a synthetic pull_request hook test endpoint, so a real PR action must occur while the tunnel is open.'
+        }
+
+        exit 0
+    }
+
     if (-not (Test-Path -LiteralPath $testbench -PathType Leaf)) {
         Write-Failure "Missing vendor/bin/testbench under [$resolvedPackageRoot]. Run Composer install before running this smoke script."
     }
@@ -429,16 +502,6 @@ try {
         Write-Failure 'Missing [cloudflared] on PATH. Install cloudflared or set PREVIEW_CLOUDFLARED_BINARY.'
     }
 
-    try {
-        $localUri = [Uri] $LocalUrl
-    } catch {
-        Write-Failure "LocalUrl [$LocalUrl] is not a valid URL."
-    }
-
-    if ($localUri.Scheme -notin @('http', 'https')) {
-        Write-Failure "LocalUrl [$LocalUrl] must use http or https."
-    }
-
     $serverHost = if ([string]::IsNullOrWhiteSpace($localUri.Host)) { '127.0.0.1' } else { $localUri.Host }
     $serverPort = if ($localUri.Port -gt 0) { $localUri.Port } elseif ($localUri.Scheme -eq 'https') { 443 } else { 80 }
 
@@ -452,6 +515,8 @@ try {
     Write-Smoke "Repo: $Repo"
     Write-Smoke "PackageRoot: $resolvedPackageRoot"
     Write-Smoke "StoragePath: $resolvedStoragePath"
+    Write-Smoke "Requested proof events: $($requestedEvents -join ', ')"
+    Write-Smoke "Temporary hook subscription events: $($hookEvents -join ', ')"
     Write-Smoke 'Webhook secret is process-local and will not be printed.'
 
     $repoInfo = Invoke-GhJson -Gh $gh -Secret $webhookSecret -Arguments @(
@@ -582,7 +647,7 @@ try {
 
     Write-Smoke 'Creating temporary GitHub repository webhook.'
 
-    $hook = Invoke-GhJson -Gh $gh -Secret $webhookSecret -Arguments @(
+    $createHookArguments = @(
         'api',
         '--method',
         'POST',
@@ -590,9 +655,14 @@ try {
         '-f',
         'name=web',
         '-F',
-        'active=true',
-        '-F',
-        'events[]=push',
+        'active=true'
+    )
+
+    foreach ($hookEvent in $hookEvents) {
+        $createHookArguments += @('-F', "events[]=$hookEvent")
+    }
+
+    $createHookArguments += @(
         '-f',
         "config[url]=$captureUrl",
         '-f',
@@ -603,6 +673,8 @@ try {
         'config[insecure_ssl]=0'
     )
 
+    $hook = Invoke-GhJson -Gh $gh -Secret $webhookSecret -Arguments $createHookArguments
+
     $hookId = [string] $hook.id
 
     if ([string]::IsNullOrWhiteSpace($hookId)) {
@@ -610,42 +682,65 @@ try {
     }
 
     Write-Smoke "Temporary webhook created: $hookId"
-    Write-Smoke 'Requesting GitHub webhook ping delivery.'
 
-    Invoke-GhSilent -Gh $gh -Secret $webhookSecret -Arguments @(
-        'api',
-        '--method',
-        'POST',
-        "repos/$Repo/hooks/$hookId/pings",
-        '--silent'
-    )
+    foreach ($requestedEvent in $requestedEvents) {
+        switch ($requestedEvent) {
+            'ping' {
+                Write-Smoke 'Requesting GitHub webhook ping delivery.'
 
-    $matchingCapture = $null
+                Invoke-GhSilent -Gh $gh -Secret $webhookSecret -Arguments @(
+                    'api',
+                    '--method',
+                    'POST',
+                    "repos/$Repo/hooks/$hookId/pings",
+                    '--silent'
+                )
+            }
+            'push' {
+                Write-Smoke 'Requesting GitHub webhook push test delivery.'
 
-    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
-        $captures = Invoke-TestbenchJson `
-            -Php $php `
-            -Testbench $testbench `
-            -Arguments @('preview:capture:list', '--json') `
-            -WorkingDirectory $resolvedPackageRoot `
-            -Secret $webhookSecret
-
-        $matchingCapture = Get-MatchingCapture -Captures $captures
-
-        if ($null -ne $matchingCapture) {
-            break
+                Invoke-GhSilent -Gh $gh -Secret $webhookSecret -Arguments @(
+                    'api',
+                    '--method',
+                    'POST',
+                    "repos/$Repo/hooks/$hookId/tests",
+                    '--silent'
+                )
+            }
+            'pull_request' {
+                Write-Smoke 'Waiting for a real GitHub pull_request webhook delivery. GitHub does not expose a synthetic pull_request test delivery endpoint.'
+                Write-Smoke "Trigger a pull request action against [$Repo] before the tunnel closes."
+            }
         }
 
-        if ($attempt -lt $Attempts) {
-            Start-Sleep -Seconds 3
+        $matchingCapture = $null
+
+        for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+            $captures = Invoke-TestbenchJson `
+                -Php $php `
+                -Testbench $testbench `
+                -Arguments @('preview:capture:list', '--json') `
+                -WorkingDirectory $resolvedPackageRoot `
+                -Secret $webhookSecret
+
+            $matchingCapture = Get-MatchingCapture -Captures $captures -EventType $requestedEvent
+
+            if ($null -ne $matchingCapture) {
+                break
+            }
+
+            if ($attempt -lt $Attempts) {
+                Start-Sleep -Seconds 3
+            }
         }
+
+        if ($null -eq $matchingCapture) {
+            Write-Failure "No verified GitHub $requestedEvent capture was found in [$resolvedStoragePath] after $Attempts attempt(s)."
+        }
+
+        Write-Smoke "Verified GitHub $requestedEvent capture stored: $($matchingCapture.id)"
     }
 
-    if ($null -eq $matchingCapture) {
-        Write-Failure "No verified GitHub ping capture was found in [$resolvedStoragePath] after $Attempts attempt(s)."
-    }
-
-    Write-Smoke "Verified GitHub ping capture stored: $($matchingCapture.id)"
     Write-Smoke 'GitHub webhook delivery smoke completed.'
     exit 0
 } finally {

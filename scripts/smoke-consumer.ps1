@@ -177,6 +177,27 @@ function Get-CommandPath {
     return $command.Source
 }
 
+function ConvertFrom-CommandJson {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Text,
+        [Parameter(Mandatory)]
+        [string] $Label
+    )
+
+    $match = [regex]::Match($Text, '(?s)(\{.*\}|\[.*\])')
+
+    if (-not $match.Success) {
+        throw "$Label did not include a JSON object or array."
+    }
+
+    try {
+        return $match.Groups[1].Value | ConvertFrom-Json
+    } catch {
+        throw "$Label included JSON-looking output that could not be parsed: $($_.Exception.Message)"
+    }
+}
+
 function Add-SmokeRoute {
     param(
         [Parameter(Mandatory)]
@@ -191,9 +212,13 @@ function Add-SmokeRoute {
 
     $route = @'
 
-Route::match(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], '/preview-smoke', function () {
+Route::post('/preview-smoke', function () {
     return response()->json(['ok' => true]);
 });
+
+Route::get('/preview-smoke-route', function () {
+    return response('preview route ok');
+})->name('preview.smoke');
 '@
 
     Add-Content -LiteralPath $routesPath -Value $route
@@ -222,7 +247,7 @@ function Install-PestIfMissing {
 
     Invoke-LoggedCommand `
         -FilePath $ComposerPath `
-        -Arguments @('require', '--dev', 'pestphp/pest', 'pestphp/pest-plugin-laravel', '--no-interaction', '--with-all-dependencies') `
+        -Arguments @('require', '--dev', 'pestphp/pest:~3.8.2', 'pestphp/pest-plugin-laravel:~3.2.0', 'phpunit/phpunit:~11.5.15', '--no-interaction', '--with-all-dependencies') `
         -WorkingDirectory $AppPath `
         -Label 'Install Pest for generated Preview tests' | Out-Null
 
@@ -273,6 +298,8 @@ $packageRoot = Resolve-ExistingDirectory -Path $PackagePath -Label 'PackagePath'
 $workRoot = Assert-SafeSmokeDirectory -Path $WorkDir -PackageRoot $packageRoot
 $appPath = Join-Path $workRoot 'app'
 $generatedTestFilter = 'handles generic preview.smoke'
+$scenarioName = 'preview-smoke-flow'
+$generatedScenarioTestFilter = "replays $scenarioName preview scenario"
 $proof = [System.Collections.Generic.List[string]]::new()
 
 try {
@@ -331,6 +358,12 @@ try {
 
     $proof.Add('artisan list includes preview:capture, preview:capture:list, preview:capture:fixture, preview:capture:test')
 
+    if ($artisanList -notmatch 'preview:scenario:make' -or $artisanList -notmatch 'preview:scenario:replay' -or $artisanList -notmatch 'preview:scenario:test') {
+        throw 'php artisan list did not include the expected Preview scenario commands.'
+    }
+
+    $proof.Add('artisan list includes preview:scenario:make, preview:scenario:replay, preview:scenario:test')
+
     $captureOutput = Invoke-LoggedCommand `
         -FilePath $php `
         -Arguments @(
@@ -379,6 +412,66 @@ try {
         -WorkingDirectory $appPath `
         -Label 'Generate Pest test for capture' | Out-Null
     $proof.Add("capture:test generated Pest test for [$captureId]")
+
+    Invoke-LoggedCommand `
+        -FilePath $php `
+        -Arguments @(
+            'artisan',
+            'preview:scenario:make',
+            $scenarioName,
+            '--capture',
+            $captureId,
+            '--route',
+            'preview.smoke',
+            '--route-status',
+            'preview.smoke=200',
+            '--route-output-contains',
+            'preview.smoke=route ok',
+            '--fake',
+            'queue',
+            '--note',
+            'Disposable consumer smoke scenario',
+            '--force'
+        ) `
+        -WorkingDirectory $appPath `
+        -Label 'Create scenario from generated capture and route' | Out-Null
+    $proof.Add("scenario:make created [$scenarioName] with capture [$captureId] and route [preview.smoke]")
+
+    $scenarioReplayOutput = Invoke-LoggedCommand `
+        -FilePath $php `
+        -Arguments @('artisan', 'preview:scenario:replay', $scenarioName, '--exact', '--json') `
+        -WorkingDirectory $appPath `
+        -Label 'Replay generated scenario'
+
+    $scenarioReplay = ConvertFrom-CommandJson -Text $scenarioReplayOutput -Label 'preview:scenario:replay'
+
+    if ($scenarioReplay.scenario -ne $scenarioName -or $scenarioReplay.successful -ne $true) {
+        throw "preview:scenario:replay did not report successful replay for [$scenarioName]."
+    }
+
+    if ($scenarioReplay.captures.Count -ne 1 -or $scenarioReplay.captures[0].id -ne $captureId) {
+        throw "preview:scenario:replay output did not include capture [$captureId]."
+    }
+
+    if ($scenarioReplay.routes.Count -ne 1 -or $scenarioReplay.routes[0].name -ne 'preview.smoke' -or $scenarioReplay.routes[0].status_code -ne 200) {
+        throw 'preview:scenario:replay output did not include successful route [preview.smoke].'
+    }
+
+    $proof.Add("scenario:replay passed for [$scenarioName] with capture [$captureId] and route [preview.smoke]")
+
+    $scenarioTestOutput = Invoke-LoggedCommand `
+        -FilePath $php `
+        -Arguments @('artisan', 'preview:scenario:test', $scenarioName, '--json') `
+        -WorkingDirectory $appPath `
+        -Label 'Generate Pest test for scenario'
+
+    $scenarioTest = ConvertFrom-CommandJson -Text $scenarioTestOutput -Label 'preview:scenario:test'
+
+    if ($scenarioTest.scenario -ne $scenarioName -or -not (Test-Path -LiteralPath $scenarioTest.test_path)) {
+        throw "preview:scenario:test did not generate a test file for [$scenarioName]."
+    }
+
+    $proof.Add("scenario:test generated Pest test [$($scenarioTest.test_path)]")
 
     $pestState = Install-PestIfMissing -ComposerPath $composer -AppPath $appPath
     $proof.Add("Pest test runner $pestState in disposable consumer app")
@@ -432,6 +525,52 @@ try {
                 Write-Host $artisanTestOutput
             }
 
+            throw
+        }
+    }
+
+    try {
+        Invoke-LoggedCommand `
+            -FilePath $php `
+            -Arguments @('artisan', 'test', "--filter=$generatedScenarioTestFilter") `
+            -WorkingDirectory $appPath `
+            -Label 'Run generated scenario test through php artisan test' | Out-Null
+        $proof.Add('generated scenario test passed via php artisan test')
+    } catch {
+        $phpunitBat = Join-Path $appPath 'vendor\bin\phpunit.bat'
+        $phpunit = Join-Path $appPath 'vendor\bin\phpunit'
+        $pestBat = Join-Path $appPath 'vendor\bin\pest.bat'
+        $pest = Join-Path $appPath 'vendor\bin\pest'
+
+        if (Test-Path -LiteralPath $pestBat) {
+            Invoke-LoggedCommand `
+                -FilePath $pestBat `
+                -Arguments @("--filter=$generatedScenarioTestFilter") `
+                -WorkingDirectory $appPath `
+                -Label 'Run generated scenario test through vendor/bin/pest fallback' | Out-Null
+            $proof.Add('generated scenario test passed via vendor/bin/pest fallback')
+        } elseif (Test-Path -LiteralPath $pest) {
+            Invoke-LoggedCommand `
+                -FilePath $php `
+                -Arguments @($pest, "--filter=$generatedScenarioTestFilter") `
+                -WorkingDirectory $appPath `
+                -Label 'Run generated scenario test through vendor/bin/pest fallback' | Out-Null
+            $proof.Add('generated scenario test passed via vendor/bin/pest fallback')
+        } elseif (Test-Path -LiteralPath $phpunitBat) {
+            Invoke-LoggedCommand `
+                -FilePath $phpunitBat `
+                -Arguments @("--filter=$generatedScenarioTestFilter") `
+                -WorkingDirectory $appPath `
+                -Label 'Run generated scenario test through vendor/bin/phpunit fallback' | Out-Null
+            $proof.Add('generated scenario test passed via vendor/bin/phpunit fallback')
+        } elseif (Test-Path -LiteralPath $phpunit) {
+            Invoke-LoggedCommand `
+                -FilePath $php `
+                -Arguments @($phpunit, "--filter=$generatedScenarioTestFilter") `
+                -WorkingDirectory $appPath `
+                -Label 'Run generated scenario test through vendor/bin/phpunit fallback' | Out-Null
+            $proof.Add('generated scenario test passed via vendor/bin/phpunit fallback')
+        } else {
             throw
         }
     }

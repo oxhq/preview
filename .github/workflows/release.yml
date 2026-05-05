@@ -13,9 +13,11 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PACKAGE_NAME: oxhq/preview
 
 jobs:
   release:
@@ -34,10 +36,19 @@ jobs:
           coverage: none
 
       - name: Install dependencies
-        run: composer update --no-interaction --no-progress --prefer-dist
+        run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Verify release surface
+      - name: Verify package surface
         run: composer ci
+
+      - name: Verify release archives
+        run: |
+          php scripts/check-source-archive.php
+          php scripts/check-dist-archive.php
+
+      - name: Verify PowerShell scripts
+        shell: pwsh
+        run: ./scripts/check-powershell-surface.ps1
 
       - name: Resolve release tag
         id: release
@@ -54,18 +65,62 @@ jobs:
             exit 1
           fi
 
+          if [[ ! "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag [${version}] must look like vMAJOR.MINOR.PATCH."
+            exit 1
+          fi
+
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
-      - name: Create GitHub release
+      - name: Register or update Packagist package
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_API_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
+        run: php scripts/sync-packagist.php --ensure
+
+      - name: Build release assets
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          mkdir -p release-assets
+          composer archive --no-interaction --format=zip --dir=release-assets --file="preview-${VERSION}"
+          (cd release-assets && sha256sum "preview-${VERSION}.zip" > SHA256SUMS)
+
+      - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release.outputs.version }}
         run: |
           if gh release view "${VERSION}" >/dev/null 2>&1; then
             echo "GitHub release [${VERSION}] already exists."
-            exit 0
+            gh release upload "${VERSION}" release-assets/* --clobber
+          else
+            gh release create "${VERSION}" \
+              release-assets/* \
+              --title "${VERSION}" \
+              --notes "Composer package release for ${PACKAGE_NAME}.
+
+          Proof commands:
+          - composer release:github -- -Version ${VERSION}
+          - composer release:packagist -- ${VERSION}
+          - composer smoke:packagist-install -- -Version ${VERSION}
+
+          Packagist may need one webhook/update cycle before ${VERSION} is visible."
           fi
 
-          gh release create "${VERSION}" \
-            --title "${VERSION}" \
-            --notes "Composer package release for oxhq/preview. Verify Packagist visibility after the repository webhook runs."
+      - name: Verify GitHub release
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: ./scripts/check-github-release.ps1 -Version $env:VERSION -RequireAssets
+
+      - name: Request Packagist tag refresh
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_API_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
+        run: php scripts/sync-packagist.php --update
+
+      - name: Verify Packagist version visibility
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: php scripts/check-packagist.php "${VERSION}" --wait=300 --interval=15

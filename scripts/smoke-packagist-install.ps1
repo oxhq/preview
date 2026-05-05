@@ -176,6 +176,12 @@ Route::match(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], '/preview-pac
 
 $workRoot = Assert-SafeSmokeDirectory -Path $WorkDir
 $appPath = Join-Path $workRoot 'app'
+$scriptRoot = if ($PSScriptRoot -ne '') {
+    $PSScriptRoot
+} else {
+    Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot '..'))
 $packageRequirement = if ([string]::IsNullOrWhiteSpace($Version)) {
     'oxhq/preview'
 } else {
@@ -192,6 +198,20 @@ try {
     Write-Host "PackageRequirement: $packageRequirement"
     Write-Host "Composer: $composer"
     Write-Host "PHP: $php"
+
+    $packagistCheckArguments = @('scripts/check-packagist.php')
+    if ([string]::IsNullOrWhiteSpace($Version)) {
+        $packagistCheckArguments += '--package-only'
+    } else {
+        $packagistCheckArguments += $Version
+    }
+
+    Invoke-LoggedCommand `
+        -FilePath $php `
+        -Arguments $packagistCheckArguments `
+        -WorkingDirectory $repoRoot `
+        -Label 'Check Packagist package visibility before install' | Out-Null
+    $proof.Add('Packagist metadata check passed before install')
 
     if (Test-Path -LiteralPath $workRoot) {
         Remove-Item -LiteralPath $workRoot -Recurse -Force

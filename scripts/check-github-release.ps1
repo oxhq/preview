@@ -5,7 +5,9 @@ param(
     [string] $Version,
 
     [ValidateNotNullOrEmpty()]
-    [string] $Repo = 'oxhq/preview'
+    [string] $Repo = 'oxhq/preview',
+
+    [switch] $RequireAssets
 )
 
 Set-StrictMode -Version Latest
@@ -53,6 +55,88 @@ function Get-JsonOrNull {
     }
 
     return $Json | ConvertFrom-Json
+}
+
+function New-TemporaryDirectory {
+    $directory = Join-Path ([System.IO.Path]::GetTempPath()) ('preview-github-release-' + [System.Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+
+    return $directory
+}
+
+function Assert-ReleaseAsset {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Assets,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Name
+    )
+
+    $asset = $Assets | Where-Object { [string] $_.name -eq $Name } | Select-Object -First 1
+
+    if ($null -eq $asset) {
+        Write-Fail "GitHub Release asset [$Name] is missing."
+        return $false
+    }
+
+    $size = [int64] $asset.size
+    if ($size -le 0) {
+        Write-Fail "GitHub Release asset [$Name] is empty."
+        return $false
+    }
+
+    Write-Ok "GitHub Release asset [$Name] exists with size [$size] bytes."
+
+    return $true
+}
+
+function Test-ChecksumFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Directory,
+
+        [Parameter(Mandatory = $true)]
+        [string] $AssetName
+    )
+
+    $assetPath = Join-Path $Directory $AssetName
+    $checksumPath = Join-Path $Directory 'SHA256SUMS'
+
+    if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
+        Write-Fail "Downloaded release asset [$AssetName] was not found."
+        return $false
+    }
+
+    if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
+        Write-Fail 'Downloaded release asset [SHA256SUMS] was not found.'
+        return $false
+    }
+
+    $checksumLines = @(Get-Content -LiteralPath $checksumPath)
+    $checksumLine = $checksumLines | Where-Object { $_ -match "(^|\s)$([regex]::Escape($AssetName))$" } | Select-Object -First 1
+
+    if ($null -eq $checksumLine) {
+        Write-Fail "SHA256SUMS does not contain an entry for [$AssetName]."
+        return $false
+    }
+
+    if ($checksumLine -notmatch '^(?<hash>[a-fA-F0-9]{64})\s+\*?(?<file>.+)$') {
+        Write-Fail "SHA256SUMS entry for [$AssetName] is not a valid sha256sum line."
+        return $false
+    }
+
+    $expectedHash = $matches.hash.ToLowerInvariant()
+    $actualHash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+
+    if ($actualHash -ne $expectedHash) {
+        Write-Fail "SHA256 mismatch for [$AssetName]: expected [$expectedHash], got [$actualHash]."
+        return $false
+    }
+
+    Write-Ok "SHA256SUMS verifies [$AssetName]."
+
+    return $true
 }
 
 $failed = $false
@@ -104,7 +188,7 @@ if ($tagResult.ExitCode -ne 0) {
     }
 }
 
-$releaseResult = Invoke-Gh @('release', 'view', $Version, '--repo', $Repo, '--json', 'tagName,url,isDraft,isPrerelease')
+$releaseResult = Invoke-Gh @('release', 'view', $Version, '--repo', $Repo, '--json', 'tagName,url,isDraft,isPrerelease,assets')
 
 if ($releaseResult.ExitCode -ne 0) {
     Write-Fail "GitHub Release for [$Version] does not exist in [$Repo]."
@@ -116,6 +200,47 @@ if ($releaseResult.ExitCode -ne 0) {
     if ([bool] $release.isDraft) {
         Write-Fail "GitHub Release [$Version] is still a draft."
         $failed = $true
+    }
+
+    if ($RequireAssets.IsPresent) {
+        $assets = @($release.assets)
+        $archiveName = "preview-$Version.zip"
+        $hasArchive = Assert-ReleaseAsset -Assets $assets -Name $archiveName
+        $hasChecksums = Assert-ReleaseAsset -Assets $assets -Name 'SHA256SUMS'
+
+        if (-not $hasArchive -or -not $hasChecksums) {
+            $failed = $true
+        } else {
+            $temporaryDirectory = New-TemporaryDirectory
+
+            try {
+                $downloadResult = Invoke-Gh @(
+                    'release',
+                    'download',
+                    $Version,
+                    '--repo',
+                    $Repo,
+                    '--dir',
+                    $temporaryDirectory,
+                    '--pattern',
+                    $archiveName,
+                    '--pattern',
+                    'SHA256SUMS',
+                    '--clobber'
+                )
+
+                if ($downloadResult.ExitCode -ne 0) {
+                    Write-Fail "Unable to download GitHub Release assets for checksum verification. $($downloadResult.Output)"
+                    $failed = $true
+                } elseif (-not (Test-ChecksumFile -Directory $temporaryDirectory -AssetName $archiveName)) {
+                    $failed = $true
+                }
+            } finally {
+                if (Test-Path -LiteralPath $temporaryDirectory) {
+                    Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force
+                }
+            }
+        }
     }
 }
 

@@ -11,5 +11,9 @@ All notable user-facing changes for `oxhq/preview` will be documented here.
 - Added CI, Dependabot, release workflow, clean consumer smoke, Packagist install smoke, tunnel startup smoke, Cloudflare Tunnel smoke alias, signed Stripe/GitHub provider smoke, Stripe CLI smoke path, GitHub/Packagist release checkers, release archive checks, source archive hygiene, security/support docs, guarded release-prep helper, and a release-surface checker so the package can distinguish local package readiness from published release proof.
 - Improved the Stripe CLI smoke so it can use a local Stripe executable path, derive the listener signing secret without printing it, start a local Testbench server, and verify that a triggered Stripe event becomes a verified Preview capture.
 - Added public-ingress smoke coverage, live GitHub webhook delivery smoke through `gh`, PowerShell script parsing checks, and expanded signed-provider smoke coverage for Shopify.
+- Added a hosted CI matrix for PHP 8.3 and 8.4 across Laravel 11 and 12 dependency lanes, plus a Windows PowerShell parser check.
+- Added Packagist sync automation for release workflows, GitHub release asset/checksum verification, Packagist visibility waiting, and a safer release-prep command that does not create tags unless explicitly requested.
+- Expanded the clean consumer smoke to cover scenario creation, scenario replay, generated scenario tests, and generated capture tests in a disposable Laravel app.
+- Expanded live provider smoke helpers with GitHub ping/push proof modes and Shopify dry-run, CLI trigger, and Admin GraphQL subscription modes.
 
 This unreleased state is package-local. It does not claim Packagist visibility, hosted CI results, live provider delivery, or production webhook proof until those release checks are completed and recorded.

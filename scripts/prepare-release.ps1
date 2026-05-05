@@ -2,6 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $Version,
 
+    [switch] $CreateTag,
+
     [switch] $PushTag,
 
     [string] $Repo = 'oxhq/preview'
@@ -75,6 +77,10 @@ if ($Version -notmatch '^v\d+\.\d+\.\d+$') {
 }
 Write-Ok "Version format validated ($Version)."
 
+if ($PushTag.IsPresent) {
+    $CreateTag = $true
+}
+
 $insideWorkTree = (Invoke-Captured 'git worktree check' { git rev-parse --is-inside-work-tree }) -join ''
 if ($insideWorkTree.Trim() -ne 'true') {
     Fail 'Current directory is not inside a git worktree.'
@@ -147,15 +153,20 @@ if ($tagExists) {
     }
 
     Write-Ok "Tag $Version already exists and points to current HEAD."
-} else {
+} elseif ($CreateTag.IsPresent) {
     Invoke-Checked "create annotated tag $Version" { git tag -a $Version -m "Release $Version" $head }
+} else {
+    Write-Ok "Tag $Version does not exist locally; CreateTag not passed, so no tag was created."
+    Write-Host "NEXT: composer release:prepare -- -Version $Version -CreateTag"
 }
 
 if ($PushTag.IsPresent) {
     Invoke-Checked "push tag $Version" { git push origin $Version }
 } else {
     Write-Ok 'PushTag not passed; tag was not pushed.'
-    Write-Host "NEXT: git push origin $Version"
+    if ($CreateTag.IsPresent -or $tagExists) {
+        Write-Host "NEXT: composer release:prepare -- -Version $Version -PushTag"
+    }
 }
 
 Write-Ok "Release prep completed for $Repo $Version at $head."

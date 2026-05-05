@@ -400,6 +400,7 @@ composer release:source
 composer release:prepare -- -Version v0.1.0
 composer release:github -- -Version v0.1.0
 composer release:packagist -- v0.1.0
+composer release:packagist-sync -- --ensure
 composer test
 ```
 
@@ -412,7 +413,11 @@ composer smoke:tunnel
 composer smoke:cloudflared -- -RequireDns
 composer smoke:ingress -- -Transport cloudflare -RequireDns
 composer smoke:provider-signatures
-composer smoke:github-webhook -- -Repo oxhq/preview -RequireDns
+composer smoke:github-webhook -- -Repo oxhq/preview -RequireDns -Event ping,push
+composer smoke:github-webhook -- -DryRun -Event ping,push,pull_request
+composer smoke:shopify-webhook
+composer smoke:shopify-webhook -- -Mode trigger
+composer smoke:shopify-webhook -- -Mode subscription -KeepSubscription
 $env:PREVIEW_STRIPE_ENDPOINT_SECRET = 'whsec_...'
 composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed
 composer smoke:stripe-cli -- -StripeBinary C:\Users\you\stripe.exe -StartServer -TriggerEvent checkout.session.completed
@@ -439,14 +444,23 @@ payloads, writes fixture and Pest files, lints the generated PHP, and deletes th
 temporary proof directory unless called with `-KeepWorkDir`.
 `composer smoke:github-webhook` creates a temporary GitHub repository webhook through
 `gh`, points it at a cloudflared Preview GitHub capture URL, requests a GitHub ping
-delivery, verifies that Laravel Preview stored a signed and verified GitHub ping capture,
-and deletes the temporary webhook.
+or push-test delivery, verifies that Laravel Preview stored signed and verified GitHub
+captures, and deletes the temporary webhook. Pull request proof is wait-only because it
+requires a real pull request action while the tunnel is open.
+`composer smoke:shopify-webhook` defaults to dry-run. Trigger mode uses Shopify CLI to
+send a signed sample webhook to a Preview capture URL. Subscription mode uses Shopify
+Admin GraphQL credentials to create and optionally keep a webhook subscription for a real
+dev-store action proof. Secrets are accepted through environment variables or parameters
+and are redacted from script output.
 `composer smoke:stripe-cli` is the real Stripe CLI proof path. It requires Stripe CLI
 auth, accepts `-StripeBinary` or `PREVIEW_STRIPE_CLI_BINARY` when `stripe` is not on
 `PATH`, can derive `PREVIEW_STRIPE_ENDPOINT_SECRET` with `stripe listen --print-secret`,
 and redacts endpoint secrets from output. Passing `-StartServer` starts a local Testbench
 HTTP server and verifies that the triggered Stripe event becomes a verified Preview
 capture.
+`composer release:packagist-sync` registers or updates the package on Packagist through
+the Packagist API. It requires `PACKAGIST_USERNAME` and `PACKAGIST_API_TOKEN`, and it does
+not print either value.
 
 ## License
 

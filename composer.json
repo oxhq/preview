@@ -77,6 +77,7 @@
         "release:github": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-github-release.ps1",
         "release:packagist": "php scripts/check-packagist.php",
         "release:prepare": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-release.ps1",
+        "release:packagist-sync": "php scripts/sync-packagist.php",
         "release:check": "php scripts/check-release-surface.php",
         "release:commands": "php scripts/check-command-surface.php",
         "release:powershell": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-powershell-surface.ps1",
@@ -88,6 +89,7 @@
         "smoke:ingress": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-public-ingress.ps1",
         "smoke:packagist-install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-packagist-install.ps1",
         "smoke:provider-signatures": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-provider-signatures.ps1",
+        "smoke:shopify-webhook": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-shopify-webhook.ps1",
         "smoke:stripe-cli": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-stripe-cli.ps1",
         "smoke:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-tunnel.ps1",
         "test": "phpunit"

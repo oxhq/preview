@@ -15,7 +15,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  test:
+  package-tests:
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }} / Testbench ${{ matrix.testbench_major }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -25,25 +26,27 @@ jobs:
           - php: '8.3'
             laravel: '11'
             illuminate: '^11.0'
+            testbench_major: '9'
             testbench: '^9.0'
             phpunit: '^11.0'
           - php: '8.3'
             laravel: '12'
             illuminate: '^12.0'
+            testbench_major: '10'
             testbench: '^10.0'
             phpunit: '^12.0'
           - php: '8.4'
             laravel: '11'
             illuminate: '^11.0'
+            testbench_major: '9'
             testbench: '^9.0'
             phpunit: '^11.0'
           - php: '8.4'
             laravel: '12'
             illuminate: '^12.0'
+            testbench_major: '10'
             testbench: '^10.0'
             phpunit: '^12.0'
-
-    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
 
     steps:
       - name: Checkout
@@ -54,28 +57,42 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-php-${{ matrix.php }}-laravel-${{ matrix.laravel }}-${{ hashFiles('composer.json', 'composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-php-${{ matrix.php }}-laravel-${{ matrix.laravel }}-
+            composer-${{ runner.os }}-php-${{ matrix.php }}-
+            composer-${{ runner.os }}-
 
       - name: Validate Composer
         run: composer validate --strict
 
-      - name: Install Laravel ${{ matrix.laravel }} dependency set
+      - name: Install Laravel ${{ matrix.laravel }} / Testbench ${{ matrix.testbench_major }} dependency lane
         run: |
-          composer require --no-interaction --no-progress --no-update \
+          composer update --no-interaction --no-progress --prefer-dist --with-all-dependencies \
             illuminate/console:${{ matrix.illuminate }} \
             illuminate/contracts:${{ matrix.illuminate }} \
             illuminate/filesystem:${{ matrix.illuminate }} \
             illuminate/support:${{ matrix.illuminate }} \
             orchestra/testbench:${{ matrix.testbench }} \
             phpunit/phpunit:${{ matrix.phpunit }}
-          composer update --no-interaction --no-progress --prefer-dist
 
-      - name: Run tests
+      - name: Run package tests
         run: composer test
 
   release-surface:
     name: Release surface / PHP 8.3
     runs-on: ubuntu-latest
-    needs: test
+    needs: package-tests
 
     steps:
       - name: Checkout
@@ -86,9 +103,50 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-php-8.3-release-${{ hashFiles('composer.json', 'composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-php-8.3-
+            composer-${{ runner.os }}-
+
+      - name: Validate Composer
+        run: composer validate --strict
 
       - name: Install dependencies
         run: composer update --no-interaction --no-progress --prefer-dist
 
-      - name: Verify release surface
-        run: composer ci
+      - name: Verify release package surface
+        run: composer run release:check
+
+      - name: Verify command surface
+        run: composer run release:commands
+
+      - name: Verify public surface
+        run: composer run release:public-surface
+
+  powershell-surface:
+    name: PowerShell parser / Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell scripts
+        shell: powershell
+        run: |
+          if ($null -eq ('System.Management.Automation.Language.Parser' -as [type])) {
+            Write-Host 'PowerShell parser API is unavailable on this runner; skipping parser surface check.'
+            exit 0
+          }
+
+          ./scripts/check-powershell-surface.ps1

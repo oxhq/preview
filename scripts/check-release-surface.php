@@ -54,11 +54,13 @@ $check(is_file($path('scripts/check-packagist.php')), 'scripts/check-packagist.p
 $check(is_file($path('scripts/check-powershell-surface.ps1')), 'scripts/check-powershell-surface.ps1 exists');
 $check(is_file($path('scripts/check-public-surface.php')), 'scripts/check-public-surface.php exists');
 $check(is_file($path('scripts/check-source-archive.php')), 'scripts/check-source-archive.php exists');
+$check(is_file($path('scripts/sync-packagist.php')), 'scripts/sync-packagist.php exists');
 $check(is_file($path('scripts/prepare-release.ps1')), 'scripts/prepare-release.ps1 exists');
 $check(is_file($path('scripts/smoke-github-webhook.ps1')), 'scripts/smoke-github-webhook.ps1 exists');
 $check(is_file($path('scripts/smoke-packagist-install.ps1')), 'scripts/smoke-packagist-install.ps1 exists');
 $check(is_file($path('scripts/smoke-public-ingress.ps1')), 'scripts/smoke-public-ingress.ps1 exists');
 $check(is_file($path('scripts/smoke-provider-signatures.ps1')), 'scripts/smoke-provider-signatures.ps1 exists');
+$check(is_file($path('scripts/smoke-shopify-webhook.ps1')), 'scripts/smoke-shopify-webhook.ps1 exists');
 $check(is_file($path('scripts/smoke-tunnel.ps1')), 'scripts/smoke-tunnel.ps1 exists');
 
 $readmePath = $path('README.md');

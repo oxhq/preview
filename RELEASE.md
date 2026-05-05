@@ -39,6 +39,11 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
   - confirm Laravel Preview captures the event locally
   - replay or generate a test from the captured event
 - Confirm GitHub Actions CI is green for the exact commit that will be tagged.
+- Configure release secrets in GitHub Actions:
+  - `PACKAGIST_USERNAME`
+  - `PACKAGIST_API_TOKEN`
+- Confirm Packagist package registration can be created or refreshed:
+  - `composer release:packagist-sync -- --ensure`
 - Prepare the tag locally after the worktree is clean and hosted CI is green:
   - `composer release:prepare -- -Version v0.1.0`
 
@@ -47,8 +52,9 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
 - Push the verified tag:
   - `composer release:prepare -- -Version v0.1.0 -PushTag`
 - Confirm the GitHub Release and tag state:
-  - `composer release:github -- -Version v0.1.0`
+  - `composer release:github -- -Version v0.1.0 -RequireAssets`
 - Confirm Packagist sees `oxhq/preview` and exposes the new version:
+  - `composer release:packagist-sync -- --update`
   - `composer release:packagist -- v0.1.0`
 
 ## Post-Release Verification
