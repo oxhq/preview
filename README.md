@@ -76,10 +76,14 @@ php artisan preview:provider:list
 php artisan preview:provider:list --json
 php artisan preview:provider:doctor
 php artisan preview:provider:doctor --json
+php artisan preview:provider:sample stripe --event=checkout.session.completed
+php artisan preview:provider:sample hmac --event=order.created --json
 ```
 
 `preview:provider:doctor` reports provider capabilities and whether built-in provider
 secrets still use placeholder values. It does not print secret values.
+`preview:provider:sample` prints synthetic provider-shaped request data for local capture
+and fixture checks. It does not use or print live provider payloads.
 
 ## Capture
 
@@ -119,6 +123,8 @@ php artisan preview:capture:stats
 php artisan preview:capture:stats --json
 php artisan preview:capture:verify {capture}
 php artisan preview:capture:verify {capture} --json
+php artisan preview:capture:integrity {capture}
+php artisan preview:capture:integrity {capture} --json
 php artisan preview:capture:export {capture}
 php artisan preview:capture:export {capture} --path=storage/preview/exports --json
 php artisan preview:capture:replay {capture} --exact
@@ -139,6 +145,8 @@ registered provider references, and redaction state without printing raw payload
 secret header values.
 `preview:capture:verify` re-runs provider verification against the stored raw body and
 raw headers, so redacted metadata cannot accidentally change the verification result.
+`preview:capture:integrity` reports raw file readability, byte counts, and SHA-256 hashes
+without printing payloads or raw headers.
 `preview:capture:stats` summarizes the local capture inventory by provider, event type,
 verification state, and capture time range.
 `preview:capture:export` writes a redacted metadata-only export. It does not copy raw
@@ -170,10 +178,14 @@ php artisan preview:fixture:list
 php artisan preview:fixture:list --json
 php artisan preview:fixture:doctor
 php artisan preview:fixture:doctor --json
+php artisan preview:fixture:stats
+php artisan preview:fixture:stats --json
 ```
 
 `preview:fixture:doctor` validates fixture manifests and companion file references
 without reading payload bodies or generated header fixtures.
+`preview:fixture:stats` summarizes fixture manifest inventory by provider, signing mode,
+and local-only payload usage without reading payload bodies.
 
 ## Route Preview
 
@@ -279,6 +291,8 @@ php artisan preview:scenario:validate subscription-renewal
 php artisan preview:scenario:validate subscription-renewal --json
 php artisan preview:scenario:validate --all
 php artisan preview:scenario:validate --all --json
+php artisan preview:scenario:export subscription-renewal
+php artisan preview:scenario:export subscription-renewal --path=storage/preview/exports/scenarios --json
 php artisan preview:scenario:replay subscription-renewal --exact
 php artisan preview:scenario:replay subscription-renewal --exact --json
 php artisan preview:scenario:replay subscription-renewal --resign
@@ -293,6 +307,8 @@ route when a partial result exists. Scenario fakes are forwarded to route previe
 not provide broader isolation than the route-preview fake flags.
 `preview:scenario:stats` summarizes the local scenario inventory without loading
 application state beyond scenario files and without executing seeds, routes, or captures.
+`preview:scenario:export` writes a safe JSON snapshot of a scenario definition without
+running seeders, executing routes, or replaying captures.
 `preview:scenario:validate` checks seed classes, capture references, named routes, route
 parameters, and route expectation references without running seeders, executing routes, or
 replaying traffic.
@@ -344,6 +360,7 @@ Run local verification:
 composer ci
 composer release:check
 composer release:dist
+composer release:source
 composer release:prepare -- -Version v0.1.0
 composer release:github -- -Version v0.1.0
 composer release:packagist -- v0.1.0

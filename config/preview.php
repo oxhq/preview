@@ -15,6 +15,7 @@ return [
     'storage_path' => env('PREVIEW_STORAGE_PATH', storage_path('framework/preview/captures')),
     'fixture_path' => env('PREVIEW_FIXTURE_PATH', base_path('tests/Fixtures/Preview')),
     'test_path' => env('PREVIEW_TEST_PATH', base_path('tests/Feature')),
+    'export_path' => env('PREVIEW_EXPORT_PATH', storage_path('preview/exports')),
 
     'redact_headers' => [
         'authorization',

@@ -10,6 +10,7 @@ use Oxhq\Preview\Commands\CaptureCommand;
 use Oxhq\Preview\Commands\CaptureDoctorCommand;
 use Oxhq\Preview\Commands\CaptureExportCommand;
 use Oxhq\Preview\Commands\CaptureFixtureCommand;
+use Oxhq\Preview\Commands\CaptureIntegrityCommand;
 use Oxhq\Preview\Commands\CaptureListCommand;
 use Oxhq\Preview\Commands\CapturePruneCommand;
 use Oxhq\Preview\Commands\CaptureReplayCommand;
@@ -20,12 +21,15 @@ use Oxhq\Preview\Commands\CaptureVerifyCommand;
 use Oxhq\Preview\Commands\ConfigShowCommand;
 use Oxhq\Preview\Commands\FixtureDoctorCommand;
 use Oxhq\Preview\Commands\FixtureListCommand;
+use Oxhq\Preview\Commands\FixtureStatsCommand;
 use Oxhq\Preview\Commands\PreviewDoctorCommand;
 use Oxhq\Preview\Commands\ProviderDoctorCommand;
 use Oxhq\Preview\Commands\ProviderListCommand;
+use Oxhq\Preview\Commands\ProviderSampleCommand;
 use Oxhq\Preview\Commands\RouteDoctorCommand;
 use Oxhq\Preview\Commands\RouteListCommand;
 use Oxhq\Preview\Commands\RoutePreviewCommand;
+use Oxhq\Preview\Commands\ScenarioExportCommand;
 use Oxhq\Preview\Commands\ScenarioListCommand;
 use Oxhq\Preview\Commands\ScenarioMakeCommand;
 use Oxhq\Preview\Commands\ScenarioReplayCommand;
@@ -203,6 +207,7 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureDoctorCommand::class,
                 CaptureExportCommand::class,
                 CaptureFixtureCommand::class,
+                CaptureIntegrityCommand::class,
                 CaptureListCommand::class,
                 CapturePruneCommand::class,
                 CaptureReplayCommand::class,
@@ -213,12 +218,15 @@ class PreviewServiceProvider extends ServiceProvider
                 ConfigShowCommand::class,
                 FixtureDoctorCommand::class,
                 FixtureListCommand::class,
+                FixtureStatsCommand::class,
                 PreviewDoctorCommand::class,
                 ProviderDoctorCommand::class,
                 ProviderListCommand::class,
+                ProviderSampleCommand::class,
                 RouteDoctorCommand::class,
                 RouteListCommand::class,
                 RoutePreviewCommand::class,
+                ScenarioExportCommand::class,
                 ScenarioListCommand::class,
                 ScenarioMakeCommand::class,
                 ScenarioReplayCommand::class,
