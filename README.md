@@ -364,7 +364,8 @@ Current proof in this repository is package-local Testbench proof plus a recorde
 12 Composer path-repository smoke for package discovery, synthetic generic capture,
 scenario creation, scenario replay, generated scenario test creation, and generated Pest
 execution in that consumer app. A repeatable `composer smoke:consumer` script now exists
-for that consumer-app proof path.
+for that consumer-app proof path. `composer smoke:provider-signatures` adds package-local
+signed-provider proof for Stripe and GitHub without requiring live provider traffic.
 The package test suite covers capture, replay, fixture generation, provider contracts,
 route preview, scenario replay, route composition, fake propagation, and generated test
 syntax/structure.
@@ -381,6 +382,9 @@ This does not prove:
   tunnel startup and URL extraction. It does not prove webhook delivery unless an external
   request reaches the generated URL.
 - real production provider traffic.
+- live GitHub webhook delivery from GitHub.com. `composer smoke:provider-signatures`
+  proves GitHub signing, capture, replay, fixture generation, and generated Pest file
+  creation with local signed data only.
 - Stripe CLI provider proof until `composer smoke:stripe-cli` is run with a real Stripe
   CLI session, endpoint secret, and trigger event.
 - every generated scenario test shape in every consumer app.
@@ -406,6 +410,8 @@ Release and integration proof helpers:
 composer smoke:consumer
 composer smoke:packagist-install -- -Version v0.1.0
 composer smoke:tunnel
+composer smoke:cloudflared -- -RequireDns
+composer smoke:provider-signatures
 $env:PREVIEW_STRIPE_ENDPOINT_SECRET = 'whsec_...'
 composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed
 ```
@@ -418,6 +424,13 @@ called with `-KeepWorkDir`.
 from the package visible on Packagist after a release.
 `composer smoke:tunnel` proves local tunnel startup and capture URL extraction only; it
 does not prove webhook delivery.
+`composer smoke:cloudflared` is the Cloudflare Tunnel-specific startup smoke. It uses the
+same tunnel smoke script with `-Transport cloudflare`, so passing `-RequireDns` also
+checks that the generated hostname resolves.
+`composer smoke:provider-signatures` generates signed Stripe and GitHub samples with
+process-local secrets, captures them, verifies them, builds exact and resign replay
+payloads, writes fixture and Pest files, lints the generated PHP, and deletes the
+temporary proof directory unless called with `-KeepWorkDir`.
 `composer smoke:stripe-cli` is the real Stripe CLI proof path and requires Stripe CLI auth
 plus `PREVIEW_STRIPE_ENDPOINT_SECRET`. It redacts endpoint secrets from output.
 

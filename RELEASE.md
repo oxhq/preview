@@ -20,6 +20,10 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
   - `php artisan preview:route:list`
 - Run a tunnel startup smoke with a local tunnel binary:
   - `composer smoke:tunnel`
+  - `composer smoke:cloudflared -- -RequireDns`
+- Run the signed-provider smoke for local Stripe and GitHub provider proof:
+  - `composer smoke:provider-signatures`
+  - confirm exact replay, resign replay, fixture generation, and generated Pest file linting pass for both providers
 - Run the Stripe CLI proof path against the consumer app:
   - set `PREVIEW_STRIPE_ENDPOINT_SECRET`
   - run `composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed`
