@@ -22,10 +22,12 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
 - Run a tunnel startup smoke with a local tunnel binary:
   - `composer smoke:tunnel`
   - `composer smoke:cloudflared -- -RequireDns`
-  - `composer smoke:ngrok`
 - Run a public ingress smoke with a local tunnel binary:
   - `composer smoke:ingress -- -Transport cloudflare -RequireDns`
   - confirm the synthetic request sent through the public URL is stored as a local capture
+- Run live GitHub webhook delivery through a temporary repository webhook:
+  - `composer smoke:github-webhook -- -Repo oxhq/preview -RequireDns`
+  - confirm the temporary webhook is deleted after the verified `ping` capture is stored
 - Run the signed-provider smoke for local Stripe and GitHub provider proof:
   - `composer smoke:provider-signatures`
   - confirm exact replay, resign replay, fixture generation, and generated Pest file linting pass for Stripe, GitHub, and Shopify

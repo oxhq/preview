@@ -377,16 +377,12 @@ This does not prove:
 - Packagist installation.
 - hosted CI for commits that have not run through GitHub Actions yet.
 - SaaS, managed relay, persistent URLs, team sharing, or audit logs.
-- ngrok live startup.
 - full public tunnel ingress from this machine. `composer smoke:tunnel` can prove local
   tunnel startup and URL extraction. It does not prove webhook delivery unless an external
   request reaches the generated URL.
-- ngrok live startup unless `composer smoke:ngrok` is run with a configured local ngrok
-  binary and account.
 - real production provider traffic.
-- live GitHub webhook delivery from GitHub.com. `composer smoke:provider-signatures`
-  proves GitHub signing, capture, replay, fixture generation, and generated Pest file
-  creation with local signed data only.
+- live GitHub webhook delivery from GitHub.com until `composer smoke:github-webhook` is
+  run with GitHub CLI repo admin permission and a local cloudflared tunnel.
 - Stripe CLI provider proof until `composer smoke:stripe-cli` is run with a real Stripe
   CLI session, endpoint secret, and trigger event.
 - every generated scenario test shape in every consumer app.
@@ -414,9 +410,9 @@ composer smoke:consumer
 composer smoke:packagist-install -- -Version v0.1.0
 composer smoke:tunnel
 composer smoke:cloudflared -- -RequireDns
-composer smoke:ngrok
 composer smoke:ingress -- -Transport cloudflare -RequireDns
 composer smoke:provider-signatures
+composer smoke:github-webhook -- -Repo oxhq/preview -RequireDns
 $env:PREVIEW_STRIPE_ENDPOINT_SECRET = 'whsec_...'
 composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed
 composer smoke:stripe-cli -- -StripeBinary C:\Users\you\stripe.exe -StartServer -TriggerEvent checkout.session.completed
@@ -433,8 +429,6 @@ does not prove webhook delivery.
 `composer smoke:cloudflared` is the Cloudflare Tunnel-specific startup smoke. It uses the
 same tunnel smoke script with `-Transport cloudflare`, so passing `-RequireDns` also
 checks that the generated hostname resolves.
-`composer smoke:ngrok` is the ngrok-specific startup smoke. It requires a configured local
-ngrok binary and account.
 `composer smoke:ingress` starts a local Testbench server, opens a Preview tunnel capture
 URL, sends a synthetic request through the public URL, and confirms Laravel Preview stored
 the capture locally. This proves public ingress from this machine, but it still does not
@@ -443,6 +437,10 @@ prove live provider-originated traffic such as GitHub.com deliveries.
 process-local secrets, captures them, verifies them, builds exact and resign replay
 payloads, writes fixture and Pest files, lints the generated PHP, and deletes the
 temporary proof directory unless called with `-KeepWorkDir`.
+`composer smoke:github-webhook` creates a temporary GitHub repository webhook through
+`gh`, points it at a cloudflared Preview GitHub capture URL, requests a GitHub ping
+delivery, verifies that Laravel Preview stored a signed and verified GitHub ping capture,
+and deletes the temporary webhook.
 `composer smoke:stripe-cli` is the real Stripe CLI proof path. It requires Stripe CLI
 auth, accepts `-StripeBinary` or `PREVIEW_STRIPE_CLI_BINARY` when `stripe` is not on
 `PATH`, can derive `PREVIEW_STRIPE_ENDPOINT_SECRET` with `stripe listen --print-secret`,
