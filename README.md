@@ -131,14 +131,23 @@ return new Scenario(
 );
 ```
 
-Scenario files compose capture IDs, named route previews, fake boundaries, an optional seed class, and optional notes. The foundation commands are intentionally read-only:
+Scenario files record capture IDs, route names for future route-preview composition, fake boundaries, an optional seed class, and optional notes. The foundation commands are intentionally read-only:
 
 ```bash
 php artisan preview:scenario:list
 php artisan preview:scenario:show subscription-renewal
 ```
 
-This slice does not claim complete scenario replay, seed composition, or generated scenario tests unless those commands and tests are implemented. Captures, route preview, fixtures, and generated Pest tests remain the proven executable surfaces today.
+Scenario replay now runs the configured seeder before replay through Laravel's normal seeder path and composes each listed capture through the existing replay engine:
+
+```bash
+php artisan preview:scenario:replay subscription-renewal --exact
+php artisan preview:scenario:replay subscription-renewal --resign
+```
+
+`--exact` replays each scenario capture with the stored raw body and captured headers. `--resign` replays each scenario capture with the stored raw body plus fresh provider-valid signature headers when the provider supports signing. Scenario replay fails clearly when a capture cannot be found, a provider cannot re-sign, or a configured seeder fails.
+
+Route composition and scenario test generation are not complete unless the route execution and Pest-compatible scenario generation commands are implemented, behavior-tested, and covered by fresh consumer evidence. Captures, route preview, fixtures, and generated capture-level Pest tests remain the proven executable surfaces today.
 
 ## Current Proof Boundary
 

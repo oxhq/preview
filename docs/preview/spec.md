@@ -454,12 +454,30 @@ Scenario files are regular PHP files stored under `preview/scenarios` by default
 
 - `name`: stable local scenario name used by list/show commands
 - `captures`: capture IDs from local capture storage
-- `routes`: Laravel route names for route-preview composition
+- `routes`: Laravel route names for future route-preview composition
 - `fakes`: supported fake boundaries such as queue, mail, HTTP, and events
 - `seed`: optional Laravel seeder class name
 - `notes`: optional human context for the flow
 
-The foundation slice does not execute seeders, replay captures, compose route-preview execution, or generate tests unless those behaviors have been implemented and verified. Full scenario replay and scenario test generation remain later v1.0 work.
+The foundation slice started as local catalog and inspection. Current package proof adds seed execution and capture replay composition, while route-preview composition and scenario test generation remain later v1.0 work.
+
+Executable Scenario slices are sequenced narrowly:
+
+1. Seed composition runs the configured seeder through Laravel's normal seeder path before any replay work. Seeder failures stop the scenario and report the failing seeder class.
+2. Capture replay composition adds `preview:scenario:replay {scenario}` and reuses existing capture replay behavior for each listed capture.
+3. Route composition executes named route previews only after the route-preview safety flags and boundaries are applied to scenario replay.
+4. Scenario test generation emits Pest-compatible tests only after seed, capture replay, and route composition are behavior-tested together.
+
+Scenario replay must preserve the existing capture replay semantics:
+
+```bash
+php artisan preview:scenario:replay subscription-renewal --exact
+php artisan preview:scenario:replay subscription-renewal --resign
+```
+
+`--exact` replays each listed capture with its stored raw body and captured headers. `--resign` replays each listed capture with its stored raw body and fresh provider-valid signature headers when the provider supports signing. If a provider cannot re-sign, the command must fail clearly instead of silently falling back to exact replay.
+
+Route composition and scenario test generation are not complete unless the commands, package tests, and consumer evidence prove them. Documentation should continue to call route names future composition metadata until those later slices ship.
 
 ## Open-Core Path
 

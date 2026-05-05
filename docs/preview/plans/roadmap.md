@@ -168,22 +168,31 @@ Foundation slice:
 - local PHP scenario files under `preview/scenarios` or configured `preview.scenario_path`
 - scenario repository that loads files returning `Oxhq\Preview\Scenario\Scenario`
 - capture ID composition
-- named route composition
+- named route metadata for future route-preview composition
 - queue/mail/event/http fake configuration metadata
 - optional seed class metadata
 - optional notes
 - `preview:scenario:list`
 - `preview:scenario:show {scenario}`
 
-Later v1.0 slices:
+Executable v1.0 slices:
 
-- seeded state execution hooks
-- capture replay composition
+- seeded state execution hooks (shipped in the current package proof)
+- capture replay composition through `preview:scenario:replay {scenario}` (shipped in the current package proof)
 - route preview execution composition
 - scenario replay command
 - scenario test generation
 
-Do not claim complete scenario replay, seed composition, or scenario test generation until those later slices are implemented and verified. The foundation slice is local-first Laravel flow cataloging and inspection.
+Seed composition executes the configured seeder through Laravel's normal seeder path before replay and fails clearly when the seeder cannot run. Capture replay composition reuses the existing capture replay engine from `preview:scenario:replay {scenario}`:
+
+```bash
+php artisan preview:scenario:replay subscription-renewal --exact
+php artisan preview:scenario:replay subscription-renewal --resign
+```
+
+`--exact` replays the stored raw body and captured headers for each scenario capture. `--resign` replays the stored raw body with fresh provider-valid signature headers when the provider supports signing, and fails clearly when a listed capture's provider cannot re-sign.
+
+Do not claim route composition or scenario test generation until those later slices are implemented and verified. Route composition is incomplete unless named route previews execute under the same safety flags and boundaries documented for route preview. Scenario test generation is incomplete unless Pest-compatible scenario files are generated and behavior-tested.
 
 Advance only if users ask to save and replay complete flows, not just individual captures.
 
