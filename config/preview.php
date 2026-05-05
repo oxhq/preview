@@ -62,6 +62,8 @@ return [
         'user_model' => env('PREVIEW_ROUTE_PREVIEW_USER_MODEL'),
     ],
 
+    'scenario_path' => env('PREVIEW_SCENARIO_PATH', base_path('preview/scenarios')),
+
     'hmac' => [
         'signature_header' => env('PREVIEW_HMAC_SIGNATURE_HEADER', 'X-Signature'),
         'secret' => env('PREVIEW_HMAC_SECRET', 'preview-secret'),

@@ -13,6 +13,8 @@ use Oxhq\Preview\Commands\CaptureReplayCommand;
 use Oxhq\Preview\Commands\CaptureShowCommand;
 use Oxhq\Preview\Commands\CaptureTestCommand;
 use Oxhq\Preview\Commands\RoutePreviewCommand;
+use Oxhq\Preview\Commands\ScenarioListCommand;
+use Oxhq\Preview\Commands\ScenarioShowCommand;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\ReplayService;
@@ -33,6 +35,7 @@ use Oxhq\Preview\Providers\PreviewProvider;
 use Oxhq\Preview\Providers\ShopifyProvider;
 use Oxhq\Preview\Providers\StripeProvider;
 use Oxhq\Preview\Route\RoutePreviewService;
+use Oxhq\Preview\Scenario\ScenarioRepository;
 use Oxhq\Preview\Testing\FixtureWriter;
 use Oxhq\Preview\Testing\PestTestWriter;
 
@@ -133,6 +136,9 @@ class PreviewServiceProvider extends ServiceProvider
 
         $this->app->singleton(HttpReplayDispatcher::class);
         $this->app->singleton(RoutePreviewService::class);
+        $this->app->singleton(ScenarioRepository::class, function (): ScenarioRepository {
+            return new ScenarioRepository((string) config('preview.scenario_path'));
+        });
 
         $this->app->singleton(FixtureWriter::class, function (): FixtureWriter {
             return new FixtureWriter(
@@ -165,6 +171,8 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureShowCommand::class,
                 CaptureTestCommand::class,
                 RoutePreviewCommand::class,
+                ScenarioListCommand::class,
+                ScenarioShowCommand::class,
             ]);
         }
 

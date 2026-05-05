@@ -85,7 +85,7 @@ oxhq/preview
 └── PreviewServiceProvider.php
 ```
 
-Do not split packages before usage proves that teams want modules independently. The product loop is sequential: captures feed fixtures, fixtures feed tests, and tests/scenarios feed replay.
+Do not split packages before usage proves that teams want modules independently. The product loop is sequential: captures feed fixtures, fixtures feed tests, and later scenarios can compose those proven assets.
 
 ## Core Module
 
@@ -425,28 +425,41 @@ Safety flags:
 
 ## Scenario Module
 
-`Preview\Scenario` is the long-term moat. It composes captures, routes, seeded state, fakes, and assertions into reusable team artifacts.
+`Preview\Scenario` is the long-term moat. It composes captures, named routes, seeded state, fakes, notes, and eventually assertions into reusable local Laravel flow artifacts.
 
-Future CLI:
+The first v1.0 foundation slice is deliberately smaller than full replay. It introduces local PHP scenario files and read-only discovery commands so teams can name and inspect flows before Laravel Preview executes them end to end.
 
 ```bash
-php artisan preview:scenario subscription-renewal
-php artisan preview:scenario replay subscription-renewal
+php artisan preview:scenario:list
+php artisan preview:scenario:show subscription-renewal
 ```
 
 Example scenario:
 
 ```php
+use App\Database\Seeders\DemoSubscriptionSeeder;
+use Oxhq\Preview\Scenario\Scenario;
+
 return new Scenario(
     name: 'subscription-renewal',
     seed: DemoSubscriptionSeeder::class,
     routes: ['billing.portal'],
-    captures: ['stripe:invoice.payment_succeeded'],
+    captures: ['20260505011852323-sugxujb2'],
     fakes: ['queue', 'mail'],
+    notes: 'Exercises the local renewal review flow after a captured provider callback.',
 );
 ```
 
-Scenarios should be built after fixtures and replay prove useful in real apps.
+Scenario files are regular PHP files stored under `preview/scenarios` by default, or the app's configured `preview.scenario_path`. Each file must return an `Oxhq\Preview\Scenario\Scenario` instance. The foundation schema composes:
+
+- `name`: stable local scenario name used by list/show commands
+- `captures`: capture IDs from local capture storage
+- `routes`: Laravel route names for route-preview composition
+- `fakes`: supported fake boundaries such as queue, mail, HTTP, and events
+- `seed`: optional Laravel seeder class name
+- `notes`: optional human context for the flow
+
+The foundation slice does not execute seeders, replay captures, compose route-preview execution, or generate tests unless those behaviors have been implemented and verified. Full scenario replay and scenario test generation remain later v1.0 work.
 
 ## Open-Core Path
 

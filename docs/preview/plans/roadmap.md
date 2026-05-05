@@ -139,35 +139,51 @@ Advance only if users ask for safe demo sharing, client review links, or route-s
 
 Goal: compose captures, route previews, seeded state, fakes, and assertions into reusable team flows.
 
-CLI target:
+Foundation CLI:
 
 ```bash
-php artisan preview:scenario subscription-renewal
-php artisan preview:scenario replay subscription-renewal
-php artisan preview:scenario list
+php artisan preview:scenario:list
+php artisan preview:scenario:show subscription-renewal
 ```
 
 Scenario example:
 
 ```php
+use App\Database\Seeders\DemoSubscriptionSeeder;
+use Oxhq\Preview\Scenario\Scenario;
+
 return new Scenario(
     name: 'subscription-renewal',
     seed: DemoSubscriptionSeeder::class,
     routes: ['billing.portal'],
-    captures: ['stripe:invoice.payment_succeeded'],
+    captures: ['20260505011852323-sugxujb2'],
     fakes: ['queue', 'mail'],
+    notes: 'Exercises the local renewal review flow after a captured provider callback.',
 );
 ```
 
-Build:
+Foundation slice:
 
 - scenario file format
-- seeded state hooks
+- local PHP scenario files under `preview/scenarios` or configured `preview.scenario_path`
+- scenario repository that loads files returning `Oxhq\Preview\Scenario\Scenario`
+- capture ID composition
+- named route composition
+- queue/mail/event/http fake configuration metadata
+- optional seed class metadata
+- optional notes
+- `preview:scenario:list`
+- `preview:scenario:show {scenario}`
+
+Later v1.0 slices:
+
+- seeded state execution hooks
 - capture replay composition
-- route preview composition
-- queue/mail/event/http fake configuration
+- route preview execution composition
 - scenario replay command
 - scenario test generation
+
+Do not claim complete scenario replay, seed composition, or scenario test generation until those later slices are implemented and verified. The foundation slice is local-first Laravel flow cataloging and inspection.
 
 Advance only if users ask to save and replay complete flows, not just individual captures.
 

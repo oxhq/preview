@@ -113,6 +113,33 @@ Repeated `--session=key=value` flags carry session context into the proxied prev
 
 Route preview now behavior-tests the supported queue, mail, HTTP, and event fakes. The auth context is not a generic authorization bypass, policy bypass, or full scenario-isolation feature.
 
+## Scenario Workbench
+
+The first v1.0 Scenario foundation slice keeps scenarios local to the Laravel app. A scenario is a PHP file under `preview/scenarios` by default, or the path configured by `PREVIEW_SCENARIO_PATH`, that returns an `Oxhq\Preview\Scenario\Scenario` instance.
+
+```php
+use App\Database\Seeders\DemoSubscriptionSeeder;
+use Oxhq\Preview\Scenario\Scenario;
+
+return new Scenario(
+    name: 'subscription-renewal',
+    seed: DemoSubscriptionSeeder::class,
+    routes: ['billing.portal'],
+    captures: ['20260505011852323-sugxujb2'],
+    fakes: ['queue', 'mail'],
+    notes: 'Exercises the local renewal review flow after a captured provider callback.',
+);
+```
+
+Scenario files compose capture IDs, named route previews, fake boundaries, an optional seed class, and optional notes. The foundation commands are intentionally read-only:
+
+```bash
+php artisan preview:scenario:list
+php artisan preview:scenario:show subscription-renewal
+```
+
+This slice does not claim complete scenario replay, seed composition, or generated scenario tests unless those commands and tests are implemented. Captures, route preview, fixtures, and generated Pest tests remain the proven executable surfaces today.
+
 ## Current Proof Boundary
 
 This repository has package-internal Testbench coverage for capture, replay, fixture generation, provider contracts, and route preview. It also has a recorded Laravel 12 path-repository consumer smoke. That is still not proof of Packagist publication, hosted CI, or live tunnel startup with real cloudflared/ngrok binaries.
