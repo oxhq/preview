@@ -76,6 +76,7 @@ php artisan preview:provider:list
 php artisan preview:provider:list --json
 php artisan preview:provider:doctor
 php artisan preview:provider:doctor --json
+php artisan preview:provider:make acme --class="App\Preview\Providers\AcmeProvider"
 php artisan preview:provider:sample stripe --event=checkout.session.completed
 php artisan preview:provider:sample hmac --event=order.created --json
 php artisan preview:provider:self-test
@@ -84,6 +85,8 @@ php artisan preview:provider:self-test stripe --json
 
 `preview:provider:doctor` reports provider capabilities and whether built-in provider
 secrets still use placeholder values. It does not print secret values.
+`preview:provider:make` writes a local provider scaffold for application-specific or
+community provider adapters. It does not register the provider automatically.
 `preview:provider:sample` prints synthetic provider-shaped request data for local capture
 and fixture checks. It does not use or print live provider payloads.
 `preview:provider:self-test` signs and verifies synthetic in-memory provider requests
@@ -116,6 +119,8 @@ Capture commands:
 php artisan preview:capture generic
 php artisan preview:capture hmac --signature-header=X-Signature
 php artisan preview:capture stripe
+php artisan preview:capture:bundle {capture}
+php artisan preview:capture:bundle {capture} --include-raw --json
 php artisan preview:capture stripe --transport=stripe-cli --live --local-url=http://127.0.0.1:8000
 php artisan preview:capture:list
 php artisan preview:capture:list --json
@@ -148,6 +153,8 @@ php artisan preview:capture:prune --before=2026-05-01
 
 Raw captures stay local. Metadata and generated fixtures redact configured sensitive
 headers such as cookies and authorization values.
+`preview:capture:bundle` writes a safe capture bundle with hashes and byte counts by
+default. Raw payload and header files are copied only when `--include-raw` is explicit.
 `preview:capture:doctor` checks capture metadata, raw body files, raw header files,
 registered provider references, and redaction state without printing raw payloads or
 secret header values.
@@ -190,12 +197,16 @@ php artisan preview:fixture:list
 php artisan preview:fixture:list --json
 php artisan preview:fixture:doctor
 php artisan preview:fixture:doctor --json
+php artisan preview:fixture:export {capture}
+php artisan preview:fixture:export {capture} --path=storage/preview/exports/fixtures --json
 php artisan preview:fixture:stats
 php artisan preview:fixture:stats --json
 ```
 
 `preview:fixture:doctor` validates fixture manifests and companion file references
 without reading payload bodies or generated header fixtures.
+`preview:fixture:export` copies generated fixture files for a capture and intentionally
+skips payload files marked local-only.
 `preview:fixture:stats` summarizes fixture manifest inventory by provider, signing mode,
 and local-only payload usage without reading payload bodies.
 
@@ -301,6 +312,8 @@ php artisan preview:scenario:list
 php artisan preview:scenario:list --json
 php artisan preview:scenario:show subscription-renewal
 php artisan preview:scenario:show subscription-renewal --json
+php artisan preview:scenario:bundle subscription-renewal
+php artisan preview:scenario:bundle subscription-renewal --path=storage/preview/exports/scenario-bundles --json
 php artisan preview:scenario:stats
 php artisan preview:scenario:stats --json
 php artisan preview:scenario:validate subscription-renewal
@@ -321,6 +334,8 @@ routes through the same signed route-preview safety layer. Replay prints a summa
 seed, capture, dispatch, and route counts, and failures include the failing dispatch or
 route when a partial result exists. Scenario fakes are forwarded to route preview; they do
 not provide broader isolation than the route-preview fake flags.
+`preview:scenario:bundle` writes a scenario bundle with scenario fields and safe summaries
+for referenced captures. It does not run seeders, execute routes, or replay captures.
 `preview:scenario:stats` summarizes the local scenario inventory without loading
 application state beyond scenario files and without executing seeds, routes, or captures.
 `preview:scenario:export` writes a safe JSON snapshot of a scenario definition without
@@ -377,6 +392,7 @@ composer ci
 composer release:check
 composer release:commands
 composer release:dist
+composer release:public-surface
 composer release:source
 composer release:prepare -- -Version v0.1.0
 composer release:github -- -Version v0.1.0

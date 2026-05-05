@@ -51,6 +51,7 @@ $check(is_file($path('scripts/check-command-surface.php')), 'scripts/check-comma
 $check(is_file($path('scripts/check-dist-archive.php')), 'scripts/check-dist-archive.php exists');
 $check(is_file($path('scripts/check-github-release.ps1')), 'scripts/check-github-release.ps1 exists');
 $check(is_file($path('scripts/check-packagist.php')), 'scripts/check-packagist.php exists');
+$check(is_file($path('scripts/check-public-surface.php')), 'scripts/check-public-surface.php exists');
 $check(is_file($path('scripts/check-source-archive.php')), 'scripts/check-source-archive.php exists');
 $check(is_file($path('scripts/prepare-release.ps1')), 'scripts/prepare-release.ps1 exists');
 $check(is_file($path('scripts/smoke-packagist-install.ps1')), 'scripts/smoke-packagist-install.ps1 exists');

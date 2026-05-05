@@ -8,6 +8,7 @@ Use this checklist before publishing `oxhq/preview` as a Composer package.
   - `composer ci`
   - `composer release:commands`
   - `composer release:dist`
+  - `composer release:public-surface`
 - After the release candidate is committed, confirm the GitHub source archive surface:
   - `composer release:source`
 - Run a clean consumer smoke in a separate Laravel app using a local path repository for `oxhq/preview`:

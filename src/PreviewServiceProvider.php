@@ -6,6 +6,7 @@ namespace Oxhq\Preview;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Route;
+use Oxhq\Preview\Commands\CaptureBundleCommand;
 use Oxhq\Preview\Commands\CaptureCommand;
 use Oxhq\Preview\Commands\CaptureCompareCommand;
 use Oxhq\Preview\Commands\CaptureDoctorCommand;
@@ -22,17 +23,20 @@ use Oxhq\Preview\Commands\CaptureTimelineCommand;
 use Oxhq\Preview\Commands\CaptureVerifyCommand;
 use Oxhq\Preview\Commands\ConfigShowCommand;
 use Oxhq\Preview\Commands\FixtureDoctorCommand;
+use Oxhq\Preview\Commands\FixtureExportCommand;
 use Oxhq\Preview\Commands\FixtureListCommand;
 use Oxhq\Preview\Commands\FixtureStatsCommand;
 use Oxhq\Preview\Commands\PreviewDoctorCommand;
 use Oxhq\Preview\Commands\ProviderDoctorCommand;
 use Oxhq\Preview\Commands\ProviderListCommand;
+use Oxhq\Preview\Commands\ProviderMakeCommand;
 use Oxhq\Preview\Commands\ProviderSampleCommand;
 use Oxhq\Preview\Commands\ProviderSelfTestCommand;
 use Oxhq\Preview\Commands\RouteDoctorCommand;
 use Oxhq\Preview\Commands\RouteExportCommand;
 use Oxhq\Preview\Commands\RouteListCommand;
 use Oxhq\Preview\Commands\RoutePreviewCommand;
+use Oxhq\Preview\Commands\ScenarioBundleCommand;
 use Oxhq\Preview\Commands\ScenarioExportCommand;
 use Oxhq\Preview\Commands\ScenarioListCommand;
 use Oxhq\Preview\Commands\ScenarioMakeCommand;
@@ -207,6 +211,7 @@ class PreviewServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                CaptureBundleCommand::class,
                 CaptureCommand::class,
                 CaptureCompareCommand::class,
                 CaptureDoctorCommand::class,
@@ -223,17 +228,20 @@ class PreviewServiceProvider extends ServiceProvider
                 CaptureVerifyCommand::class,
                 ConfigShowCommand::class,
                 FixtureDoctorCommand::class,
+                FixtureExportCommand::class,
                 FixtureListCommand::class,
                 FixtureStatsCommand::class,
                 PreviewDoctorCommand::class,
                 ProviderDoctorCommand::class,
                 ProviderListCommand::class,
+                ProviderMakeCommand::class,
                 ProviderSampleCommand::class,
                 ProviderSelfTestCommand::class,
                 RouteDoctorCommand::class,
                 RouteExportCommand::class,
                 RouteListCommand::class,
                 RoutePreviewCommand::class,
+                ScenarioBundleCommand::class,
                 ScenarioExportCommand::class,
                 ScenarioListCommand::class,
                 ScenarioMakeCommand::class,
