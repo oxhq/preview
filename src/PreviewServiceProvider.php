@@ -27,6 +27,7 @@ use Oxhq\Preview\Core\ProviderRegistry;
 use Oxhq\Preview\Core\RedactionPolicy;
 use Oxhq\Preview\Core\Transport\CloudflareTunnelTransport;
 use Oxhq\Preview\Core\Transport\NgrokTunnelTransport;
+use Oxhq\Preview\Core\Transport\StripeCliTunnelTransport;
 use Oxhq\Preview\Core\Transport\TransportRegistry;
 use Oxhq\Preview\Core\Transport\TunnelTransport;
 use Oxhq\Preview\Http\CaptureController;
@@ -120,6 +121,13 @@ class PreviewServiceProvider extends ServiceProvider
         $this->app->bind(NgrokTunnelTransport::class, function (): NgrokTunnelTransport {
             return new NgrokTunnelTransport(
                 binary: (string) config('preview.transport_binaries.ngrok', 'ngrok'),
+            );
+        });
+
+        $this->app->bind(StripeCliTunnelTransport::class, function (): StripeCliTunnelTransport {
+            return new StripeCliTunnelTransport(
+                binary: (string) config('preview.transport_binaries.stripe_cli', 'stripe'),
+                capturePathTemplate: (string) config('preview.http_capture.path', '/__preview/capture/{provider}'),
             );
         });
 

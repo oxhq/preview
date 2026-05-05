@@ -47,6 +47,23 @@ final class ProcessTunnelTransportTest extends TestCase
         $transport->open('http://localhost:8000');
     }
 
+    public function test_cloudflare_tunnel_default_timeout_allows_slow_quick_tunnel_startup(): void
+    {
+        $process = new DelayedOutputTransportProcess(
+            output: '2026-05-02 INF Your quick Tunnel has been created! https://preview-demo.trycloudflare.com 2026-05-02 INF Registered tunnel connection',
+            delaySeconds: 2.2,
+        );
+
+        $transport = new CloudflareTunnelTransport(
+            new RecordingProcessFactory($process)(...),
+            pollIntervalMicroseconds: 50_000,
+        );
+
+        $handle = $transport->open('http://localhost:8000');
+
+        $this->assertSame('https://preview-demo.trycloudflare.com', $handle->publicUrl);
+    }
+
     public function test_ngrok_tunnel_starts_expected_command_and_parses_forwarding_url(): void
     {
         $process = new FakeTransportProcess(
@@ -158,5 +175,58 @@ final class FakeTransportProcess implements TransportProcess
     public function getPid(): ?int
     {
         return $this->pid;
+    }
+}
+
+final class DelayedOutputTransportProcess implements TransportProcess
+{
+    public bool $started = false;
+    public bool $stopped = false;
+    private float $startedAt = 0.0;
+    private bool $outputRead = false;
+
+    public function __construct(
+        private readonly string $output,
+        private readonly float $delaySeconds,
+    ) {
+    }
+
+    public function start(): void
+    {
+        $this->started = true;
+        $this->startedAt = microtime(true);
+    }
+
+    public function isRunning(): bool
+    {
+        return ! $this->stopped;
+    }
+
+    public function getIncrementalOutput(): string
+    {
+        if ($this->outputRead || ! $this->started || (microtime(true) - $this->startedAt) < $this->delaySeconds) {
+            return '';
+        }
+
+        $this->outputRead = true;
+
+        return $this->output;
+    }
+
+    public function getIncrementalErrorOutput(): string
+    {
+        return '';
+    }
+
+    public function stop(float $timeout = 10.0): ?int
+    {
+        $this->stopped = true;
+
+        return 0;
+    }
+
+    public function getPid(): ?int
+    {
+        return null;
     }
 }

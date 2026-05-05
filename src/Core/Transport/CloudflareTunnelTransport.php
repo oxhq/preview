@@ -11,7 +11,7 @@ class CloudflareTunnelTransport extends ProcessTunnelTransport
      */
     public function __construct(
         ?callable $processFactory = null,
-        float $urlTimeoutSeconds = 2.0,
+        float $urlTimeoutSeconds = 15.0,
         int $pollIntervalMicroseconds = 50_000,
         private readonly string $binary = 'cloudflared',
         private readonly float $readinessDelaySeconds = 0.0,

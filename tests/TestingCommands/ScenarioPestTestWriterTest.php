@@ -19,7 +19,26 @@ final class ScenarioPestTestWriterTest extends TestCase
             name: 'checkout-flow',
             seed: 'Database\\Seeders\\CheckoutScenarioSeeder',
             routes: ['checkout.show', 'checkout.success'],
+            routeParameters: [
+                'checkout.show' => ['tenant' => 'acme', 'order' => '42'],
+                'checkout.success' => ['receipt' => 'abc123'],
+            ],
             captures: ['cap_checkout_completed', 'cap_order_created'],
+            fakes: ['queue', 'events'],
+            routeContext: [
+                'checkout.show' => [
+                    'session' => ['currency' => 'usd', 'tenant' => 'acme'],
+                    'guard' => 'web',
+                    'user_id' => '42',
+                    'user_model' => 'App\\Models\\User',
+                    'readonly_db' => true,
+                    'fakes' => ['mail'],
+                ],
+                'checkout.success' => [
+                    'session' => ['receipt_viewed' => 'yes'],
+                    'fakes' => ['http'],
+                ],
+            ],
         ));
 
         $contents = (string) file_get_contents($path);
@@ -44,11 +63,53 @@ final class ScenarioPestTestWriterTest extends TestCase
         $this->assertStringContainsString("\$this->assertSame('cap_order_created', \$result->captures[1]['id'] ?? null);", $contents);
         $this->assertStringContainsString('$this->assertCount(2, $result->dispatches);', $contents);
         $this->assertStringContainsString(
+            'Scenario fake boundaries requested: queue, events.',
+            $contents,
+        );
+        $this->assertStringContainsString(
             'Route replay expected: checkout.show',
             $contents,
         );
         $this->assertStringContainsString(
+            'Route [checkout.show] parameters required by scenario: tenant=acme, order=42.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] session keys required by scenario: currency, tenant.',
+            $contents,
+        );
+        $this->assertStringNotContainsString('currency=usd', $contents);
+        $this->assertStringContainsString(
+            'Route [checkout.show] guard context requested: web.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] user context requested: user id 42 via App\\Models\\User.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] readonly-db requested.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] fake boundaries requested: mail.',
+            $contents,
+        );
+        $this->assertStringContainsString(
             'Route replay expected: checkout.success',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.success] parameters required by scenario: receipt=abc123.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.success] session keys required by scenario: receipt_viewed.',
+            $contents,
+        );
+        $this->assertStringNotContainsString('receipt_viewed=yes', $contents);
+        $this->assertStringContainsString(
+            'Route [checkout.success] fake boundaries requested: http.',
             $contents,
         );
         $this->assertStringContainsString('$this->assertCount(2, $result->routes);', $contents);
@@ -97,7 +158,19 @@ final class ScenarioPestTestWriterTest extends TestCase
             name: "checkout's\nflow",
             seed: "Database\\Seeders\\CheckoutScenarioSeeder?>",
             routes: ["checkout.success\n?>"],
+            routeParameters: ["checkout.success\n?>" => ["tenant\n?>" => "acme\n?>"]],
             captures: ["cap_order's\ncreated"],
+            fakes: ["queue\n?>"],
+            routeContext: [
+                "checkout.success\n?>" => [
+                    'session' => ["secret\n?>" => "do-not-print\n?>"],
+                    'guard' => "web\n?>",
+                    'user_id' => "42\n?>",
+                    'user_model' => "App\\Models\\User\n?>",
+                    'readonly_db' => true,
+                    'fakes' => ["mail\n?>"],
+                ],
+            ],
         ));
 
         $contents = (string) file_get_contents($path);
@@ -105,6 +178,14 @@ final class ScenarioPestTestWriterTest extends TestCase
         $this->assertStringContainsString("it('replays checkout\\'s", $contents);
         $this->assertStringContainsString('Database\\Seeders\\CheckoutScenarioSeeder? >', $contents);
         $this->assertStringContainsString('Route replay expected: checkout.success ? >', $contents);
+        $this->assertStringContainsString('Scenario fake boundaries requested: queue ? >.', $contents);
+        $this->assertStringContainsString('Route [checkout.success ? >] parameters required by scenario: tenant ? >=acme ? >.', $contents);
+        $this->assertStringContainsString('Route [checkout.success ? >] session keys required by scenario: secret ? >.', $contents);
+        $this->assertStringNotContainsString('do-not-print', $contents);
+        $this->assertStringContainsString('Route [checkout.success ? >] guard context requested: web ? >.', $contents);
+        $this->assertStringContainsString('Route [checkout.success ? >] user context requested: user id 42 ? > via App\\Models\\User ? >.', $contents);
+        $this->assertStringContainsString('Route [checkout.success ? >] readonly-db requested.', $contents);
+        $this->assertStringContainsString('Route [checkout.success ? >] fake boundaries requested: mail ? >.', $contents);
         $this->assertPhpFileIsLintable($path);
     }
 

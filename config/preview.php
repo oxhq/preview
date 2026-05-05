@@ -9,11 +9,12 @@ use Oxhq\Preview\Providers\ShopifyProvider;
 use Oxhq\Preview\Providers\StripeProvider;
 use Oxhq\Preview\Core\Transport\CloudflareTunnelTransport;
 use Oxhq\Preview\Core\Transport\NgrokTunnelTransport;
+use Oxhq\Preview\Core\Transport\StripeCliTunnelTransport;
 
 return [
     'storage_path' => env('PREVIEW_STORAGE_PATH', storage_path('framework/preview/captures')),
     'fixture_path' => env('PREVIEW_FIXTURE_PATH', base_path('tests/Fixtures/Preview')),
-    'test_path' => env('PREVIEW_TEST_PATH', base_path('tests/Feature/Preview')),
+    'test_path' => env('PREVIEW_TEST_PATH', base_path('tests/Feature')),
 
     'redact_headers' => [
         'authorization',
@@ -36,12 +37,13 @@ return [
     'transports' => [
         'cloudflare' => CloudflareTunnelTransport::class,
         'ngrok' => NgrokTunnelTransport::class,
-        'stripe-cli' => null,
+        'stripe-cli' => StripeCliTunnelTransport::class,
     ],
 
     'transport_binaries' => [
         'cloudflare' => env('PREVIEW_CLOUDFLARED_BINARY', 'cloudflared'),
         'ngrok' => env('PREVIEW_NGROK_BINARY', 'ngrok'),
+        'stripe_cli' => env('PREVIEW_STRIPE_CLI_BINARY', 'stripe'),
     ],
 
     'transport_readiness_delay' => [

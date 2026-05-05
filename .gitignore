@@ -4,3 +4,15 @@
 /coverage/
 /storage/framework/preview/
 /tests/Fixtures/Preview/.local/
+
+# Local-only product/spec planning. Public package repos should keep only
+# end-user-facing docs and executable package code.
+/.preview-internal/
+/.agents/
+/.claude/
+/.codex/
+/.gemini/
+/docs/preview/
+AGENTS.md
+CLAUDE.md
+GEMINI.md

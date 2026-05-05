@@ -87,6 +87,7 @@ Capture commands:
 php artisan preview:capture generic
 php artisan preview:capture hmac --signature-header=X-Signature
 php artisan preview:capture stripe
+php artisan preview:capture stripe --transport=stripe-cli --live --local-url=http://127.0.0.1:8000
 php artisan preview:capture:list
 php artisan preview:capture:show {capture}
 php artisan preview:capture:replay {capture} --exact
@@ -97,6 +98,10 @@ php artisan preview:capture:test {capture}
 
 Raw captures stay local. Metadata and generated fixtures redact configured sensitive
 headers such as cookies and authorization values.
+
+`stripe-cli` is an optional convenience transport. It starts `stripe listen` and forwards
+Stripe events to the local Preview Stripe capture endpoint. It still requires `--live`,
+`preview.live_enabled=true`, a runnable Stripe CLI binary, and normal Stripe CLI auth.
 
 ## Route Preview
 
@@ -195,7 +200,9 @@ replay result object instead of only checking command text.
 ## Proof Boundary
 
 Current proof in this repository is package-local Testbench proof plus a recorded Laravel
-12 Composer path-repository smoke for package discovery and synthetic generic capture.
+12 Composer path-repository smoke for package discovery, synthetic generic capture,
+scenario creation, scenario replay, generated scenario test creation, and generated Pest
+execution in that consumer app.
 The package test suite covers capture, replay, fixture generation, provider contracts,
 route preview, scenario replay, route composition, fake propagation, and generated test
 syntax/structure.
@@ -205,9 +212,12 @@ This does not prove:
 - Packagist installation.
 - hosted CI.
 - SaaS, managed relay, persistent URLs, team sharing, or audit logs.
-- live startup with real cloudflared or ngrok binaries.
+- ngrok live startup.
+- full public tunnel ingress from this machine. A real `cloudflared` binary starts and
+  prints a public URL locally, but public DNS resolution for the generated
+  `trycloudflare.com` hostname was blocked during local proof.
 - real production provider traffic.
-- every generated scenario test running inside a fresh consumer app with Pest installed.
+- every generated scenario test shape in every consumer app.
 
 Run local verification:
 

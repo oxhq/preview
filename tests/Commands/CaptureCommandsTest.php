@@ -7,6 +7,8 @@ namespace Oxhq\Preview\Tests\Commands;
 use Oxhq\Preview\Capture\CaptureRepository;
 use Oxhq\Preview\Capture\HttpReplayDispatcher;
 use Oxhq\Preview\Capture\ReplayResult;
+use Oxhq\Preview\Core\Transport\StripeCliTunnelTransport;
+use Oxhq\Preview\Core\Transport\TransportProcess;
 use Oxhq\Preview\Core\Transport\TransportRegistry;
 use Oxhq\Preview\Core\Transport\TunnelHandle;
 use Oxhq\Preview\Core\Transport\TunnelTransport;
@@ -50,6 +52,38 @@ final class CaptureCommandsTest extends TestCase
 
         $this->assertSame(['http://127.0.0.1:9000'], $transport->openedLocalUrls);
         $this->assertSame(['https://public.example.test'], $transport->closedPublicUrls);
+        $this->assertCount(0, app(CaptureRepository::class)->all());
+    }
+
+    public function test_capture_command_can_start_stripe_cli_transport_when_live_opt_in_is_enabled(): void
+    {
+        $this->app['config']->set('preview.live_enabled', true);
+        $process = new CaptureFakeTransportProcess(pid: 9876);
+        $factory = new CaptureRecordingProcessFactory($process);
+        $transport = new StripeCliTunnelTransport(
+            processFactory: $factory(...),
+            binary: 'C:\\Tools\\Stripe CLI\\stripe.exe',
+            capturePathTemplate: '/__preview/capture/{provider}',
+        );
+        $registry = new TransportRegistry();
+        $registry->register('stripe-cli', $transport);
+        $this->app->instance(TransportRegistry::class, $registry);
+
+        $this->artisan('preview:capture', [
+            'provider' => 'stripe',
+            '--transport' => 'stripe-cli',
+            '--local-url' => 'http://127.0.0.1:9000',
+            '--live' => true,
+        ])
+            ->expectsOutput('Capture URL: http://127.0.0.1:9000/__preview/capture/stripe')
+            ->assertExitCode(0);
+
+        $this->assertSame(
+            ['C:\\Tools\\Stripe CLI\\stripe.exe', 'listen', '--forward-to', 'http://127.0.0.1:9000/__preview/capture/stripe'],
+            $factory->commands[0],
+        );
+        $this->assertTrue($process->started);
+        $this->assertTrue($process->stopped);
         $this->assertCount(0, app(CaptureRepository::class)->all());
     }
 
@@ -284,5 +318,65 @@ final class RecordingTunnelTransport implements TunnelTransport
     public function close(TunnelHandle $handle): void
     {
         $this->closedPublicUrls[] = $handle->publicUrl;
+    }
+}
+
+final class CaptureRecordingProcessFactory
+{
+    /** @var list<list<string>> */
+    public array $commands = [];
+
+    public function __construct(private readonly TransportProcess $process)
+    {
+    }
+
+    /** @param list<string> $command */
+    public function __invoke(array $command): TransportProcess
+    {
+        $this->commands[] = $command;
+
+        return $this->process;
+    }
+}
+
+final class CaptureFakeTransportProcess implements TransportProcess
+{
+    public bool $started = false;
+    public bool $stopped = false;
+
+    public function __construct(private readonly ?int $pid = null)
+    {
+    }
+
+    public function start(): void
+    {
+        $this->started = true;
+    }
+
+    public function isRunning(): bool
+    {
+        return ! $this->stopped;
+    }
+
+    public function getIncrementalOutput(): string
+    {
+        return '';
+    }
+
+    public function getIncrementalErrorOutput(): string
+    {
+        return '';
+    }
+
+    public function stop(float $timeout = 10.0): ?int
+    {
+        $this->stopped = true;
+
+        return 0;
+    }
+
+    public function getPid(): ?int
+    {
+        return $this->pid;
     }
 }

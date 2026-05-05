@@ -24,7 +24,21 @@ return new Scenario(
     name: 'checkout-flow',
     seed: 'Database\\Seeders\\CheckoutScenarioSeeder',
     routes: ['checkout.show', 'checkout.success'],
+    routeParameters: [
+        'checkout.show' => ['tenant' => 'acme'],
+    ],
+    routeContext: [
+        'checkout.show' => [
+            'session' => ['currency' => 'usd'],
+            'guard' => 'web',
+            'user_id' => '42',
+            'user_model' => 'App\\Models\\User',
+            'readonly_db' => true,
+            'fakes' => ['mail'],
+        ],
+    ],
     captures: ['cap_checkout_completed', 'cap_order_created'],
+    fakes: ['queue'],
 );
 PHP);
 
@@ -55,6 +69,35 @@ PHP);
         $this->assertStringContainsString('$this->assertCount(2, $result->dispatches);', $contents);
         $this->assertStringContainsString(
             'Route replay expected: checkout.show',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Scenario fake boundaries requested: queue.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] parameters required by scenario: tenant=acme.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] session keys required by scenario: currency.',
+            $contents,
+        );
+        $this->assertStringNotContainsString('currency=usd', $contents);
+        $this->assertStringContainsString(
+            'Route [checkout.show] guard context requested: web.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] user context requested: user id 42 via App\\Models\\User.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] readonly-db requested.',
+            $contents,
+        );
+        $this->assertStringContainsString(
+            'Route [checkout.show] fake boundaries requested: mail.',
             $contents,
         );
         $this->assertStringContainsString(
