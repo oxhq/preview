@@ -316,29 +316,53 @@ and optional response text; otherwise they keep the default 2xx route-success as
 Current proof in this repository is package-local Testbench proof plus a recorded Laravel
 12 Composer path-repository smoke for package discovery, synthetic generic capture,
 scenario creation, scenario replay, generated scenario test creation, and generated Pest
-execution in that consumer app.
+execution in that consumer app. A repeatable `composer smoke:consumer` script now exists
+for that consumer-app proof path.
 The package test suite covers capture, replay, fixture generation, provider contracts,
 route preview, scenario replay, route composition, fake propagation, and generated test
 syntax/structure.
+CI and release workflows are present in `.github/workflows`, but hosted CI/release proof
+exists only after those workflows run on GitHub for the target commit or tag.
 
 This does not prove:
 
 - Packagist installation.
-- hosted CI.
+- hosted CI for commits that have not run through GitHub Actions yet.
 - SaaS, managed relay, persistent URLs, team sharing, or audit logs.
 - ngrok live startup.
-- full public tunnel ingress from this machine. A real `cloudflared` binary starts and
-  prints a public URL locally, but public DNS resolution for the generated
-  `trycloudflare.com` hostname was blocked during local proof.
+- full public tunnel ingress from this machine. `composer smoke:tunnel` can prove local
+  tunnel startup and URL extraction. It does not prove webhook delivery unless an external
+  request reaches the generated URL.
 - real production provider traffic.
+- Stripe CLI provider proof until `composer smoke:stripe-cli` is run with a real Stripe
+  CLI session, endpoint secret, and trigger event.
 - every generated scenario test shape in every consumer app.
 
 Run local verification:
 
 ```bash
-composer validate --strict
+composer ci
+composer release:check
 composer test
 ```
+
+Release and integration proof helpers:
+
+```powershell
+composer smoke:consumer
+composer smoke:tunnel
+$env:PREVIEW_STRIPE_ENDPOINT_SECRET = 'whsec_...'
+composer smoke:stripe-cli -- -TriggerEvent checkout.session.completed
+```
+
+`composer smoke:consumer` creates a disposable Laravel app, installs `oxhq/preview`
+through a Composer path repository, captures a generic request, generates a fixture and
+Pest test, runs the generated test, and deletes the disposable app unless the script is
+called with `-KeepWorkDir`.
+`composer smoke:tunnel` proves local tunnel startup and capture URL extraction only; it
+does not prove webhook delivery.
+`composer smoke:stripe-cli` is the real Stripe CLI proof path and requires Stripe CLI auth
+plus `PREVIEW_STRIPE_ENDPOINT_SECRET`. It redacts endpoint secrets from output.
 
 ## License
 

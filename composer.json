@@ -33,6 +33,15 @@
         }
     },
     "scripts": {
+        "ci": [
+            "composer validate --strict",
+            "php scripts/check-release-surface.php",
+            "phpunit"
+        ],
+        "release:check": "php scripts/check-release-surface.php",
+        "smoke:consumer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-consumer.ps1",
+        "smoke:stripe-cli": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-stripe-cli.ps1",
+        "smoke:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-tunnel.ps1",
         "test": "phpunit"
     },
     "minimum-stability": "stable",
