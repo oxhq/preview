@@ -143,8 +143,20 @@ if ($latestRun.conclusion -ne 'success') {
 Write-Ok "Latest GitHub CI run succeeded for $head. URL: $($latestRun.url)"
 
 $tagRef = "refs/tags/$Version"
-$null = & git show-ref --tags --verify $tagRef 2>$null
-$tagExists = $LASTEXITCODE -eq 0
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    $null = & git show-ref --tags --verify $tagRef 2>$null
+    $tagLookupExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+
+if ($tagLookupExitCode -ne 0 -and $tagLookupExitCode -ne 1) {
+    Fail "Could not check tag $Version. git show-ref exited with code $tagLookupExitCode."
+}
+
+$tagExists = $tagLookupExitCode -eq 0
 
 if ($tagExists) {
     $existingTagTarget = ((Invoke-Captured "resolve tag $Version" { git rev-parse "$Version^{commit}" }) -join '').Trim()
