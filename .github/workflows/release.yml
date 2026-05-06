@@ -117,6 +117,7 @@ jobs:
       - name: Verify GitHub release
         shell: pwsh
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release.outputs.version }}
         run: ./scripts/check-github-release.ps1 -Version $env:VERSION -RequireAssets
 
