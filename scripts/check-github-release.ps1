@@ -248,7 +248,7 @@ $run = $null
 $runSource = ''
 
 if ($commitSha -ne '') {
-    $commitRunResult = Invoke-Gh @('run', 'list', '--repo', $Repo, '--commit', $commitSha, '--limit', '1', '--json', 'databaseId,name,status,conclusion,headBranch,headSha,url,createdAt')
+    $commitRunResult = Invoke-Gh @('run', 'list', '--repo', $Repo, '--workflow', 'CI', '--commit', $commitSha, '--limit', '1', '--json', 'databaseId,name,status,conclusion,headBranch,headSha,url,createdAt')
 
     if ($commitRunResult.ExitCode -eq 0) {
         $commitRunsJson = Get-JsonOrNull $commitRunResult.Output
