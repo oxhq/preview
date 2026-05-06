@@ -76,7 +76,13 @@ jobs:
         env:
           PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
           PACKAGIST_API_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
-        run: php scripts/sync-packagist.php --ensure
+        run: |
+          if [ -n "${PACKAGIST_USERNAME}" ] && [ -n "${PACKAGIST_API_TOKEN}" ]; then
+            php scripts/sync-packagist.php --ensure
+          else
+            echo "PACKAGIST_USERNAME/PACKAGIST_API_TOKEN are not available to this workflow."
+            echo "Continuing in Packagist webhook mode; final Packagist visibility check will prove whether the package/webhook is configured."
+          fi
 
       - name: Build release assets
         env:
@@ -118,7 +124,13 @@ jobs:
         env:
           PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
           PACKAGIST_API_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
-        run: php scripts/sync-packagist.php --update
+        run: |
+          if [ -n "${PACKAGIST_USERNAME}" ] && [ -n "${PACKAGIST_API_TOKEN}" ]; then
+            php scripts/sync-packagist.php --update
+          else
+            echo "PACKAGIST_USERNAME/PACKAGIST_API_TOKEN are not available to this workflow."
+            echo "Waiting for Packagist's GitHub webhook/update cycle to expose the tag."
+          fi
 
       - name: Verify Packagist version visibility
         env:

@@ -12,7 +12,7 @@ All notable user-facing changes for `oxhq/preview` will be documented here.
 - Improved the Stripe CLI smoke so it can use a local Stripe executable path, derive the listener signing secret without printing it, start a local Testbench server, and verify that a triggered Stripe event becomes a verified Preview capture.
 - Added public-ingress smoke coverage, live GitHub webhook delivery smoke through `gh`, PowerShell script parsing checks, and expanded signed-provider smoke coverage for Shopify.
 - Added a hosted CI matrix for PHP 8.3 and 8.4 across Laravel 11 and 12 dependency lanes, plus a Windows PowerShell parser check.
-- Added Packagist sync automation for release workflows, GitHub release asset/checksum verification, Packagist visibility waiting, and a safer release-prep command that does not create tags unless explicitly requested.
+- Added optional Packagist sync automation for release workflows, webhook-mode Packagist visibility waiting, GitHub release asset/checksum verification, and a safer release-prep command that does not create tags unless explicitly requested.
 - Expanded the clean consumer smoke to cover scenario creation, scenario replay, generated scenario tests, and generated capture tests in a disposable Laravel app.
 - Expanded live provider smoke helpers with GitHub ping/push proof modes and Shopify dry-run, CLI trigger, and Admin GraphQL subscription modes.
 

@@ -458,9 +458,10 @@ auth, accepts `-StripeBinary` or `PREVIEW_STRIPE_CLI_BINARY` when `stripe` is no
 and redacts endpoint secrets from output. Passing `-StartServer` starts a local Testbench
 HTTP server and verifies that the triggered Stripe event becomes a verified Preview
 capture.
-`composer release:packagist-sync` registers or updates the package on Packagist through
-the Packagist API. It requires `PACKAGIST_USERNAME` and `PACKAGIST_API_TOKEN`, and it does
-not print either value.
+`composer release:packagist-sync` is optional when Packagist's GitHub webhook already
+updates the package. It registers or updates the package through the Packagist API when
+`PACKAGIST_USERNAME` and `PACKAGIST_API_TOKEN` are available, and it does not print either
+value.
 
 ## License
 
