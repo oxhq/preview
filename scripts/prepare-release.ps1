@@ -146,14 +146,14 @@ $tagRef = "refs/tags/$Version"
 $previousErrorActionPreference = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-    $null = & git show-ref --tags --verify $tagRef 2>$null
+    $null = & git rev-parse --verify --quiet $tagRef 2>$null
     $tagLookupExitCode = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $previousErrorActionPreference
 }
 
 if ($tagLookupExitCode -ne 0 -and $tagLookupExitCode -ne 1) {
-    Fail "Could not check tag $Version. git show-ref exited with code $tagLookupExitCode."
+    Fail "Could not check tag $Version. git rev-parse exited with code $tagLookupExitCode."
 }
 
 $tagExists = $tagLookupExitCode -eq 0
