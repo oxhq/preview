@@ -38,7 +38,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-          extensions: fileinfo
+          extensions: fileinfo, pdo_sqlite, sqlite3
           tools: composer:v2
 
       - name: Run Packagist install smoke
