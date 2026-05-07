@@ -48,10 +48,12 @@ jobs:
             $version = '${{ inputs.version }}'
           }
 
-          $arguments = @('-LaravelVersion', '${{ matrix.laravel }}')
-
-          if (-not [string]::IsNullOrWhiteSpace($version)) {
-            $arguments = @('-Version', $version) + $arguments
+          $parameters = @{
+            LaravelVersion = '${{ matrix.laravel }}'
           }
 
-          ./scripts/smoke-packagist-install.ps1 @arguments
+          if (-not [string]::IsNullOrWhiteSpace($version)) {
+            $parameters.Version = $version
+          }
+
+          ./scripts/smoke-packagist-install.ps1 @parameters
