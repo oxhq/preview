@@ -38,6 +38,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
+          extensions: fileinfo
           tools: composer:v2
 
       - name: Run Packagist install smoke
