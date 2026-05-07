@@ -46,6 +46,7 @@ $check(is_file($path('SUPPORT.md')), 'SUPPORT.md exists');
 $check(is_file($path('.gitattributes')), '.gitattributes exists');
 $check(is_file($path('.github/dependabot.yml')), '.github/dependabot.yml exists');
 $check(is_file($path('.github/workflows/ci.yml')), '.github/workflows/ci.yml exists');
+$check(is_file($path('.github/workflows/packagist-smoke.yml')), '.github/workflows/packagist-smoke.yml exists');
 $check(is_file($path('.github/workflows/release.yml')), '.github/workflows/release.yml exists');
 $check(is_file($path('scripts/check-command-surface.php')), 'scripts/check-command-surface.php exists');
 $check(is_file($path('scripts/check-dist-archive.php')), 'scripts/check-dist-archive.php exists');

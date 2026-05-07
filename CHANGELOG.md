@@ -4,6 +4,17 @@ All notable user-facing changes for `oxhq/preview` will be documented here.
 
 ## Unreleased
 
+## v0.1.1 - 2026-05-07
+
+- Added a hosted Packagist install smoke workflow for published package checks across
+  PHP 8.3, PHP 8.4, Laravel 11, and Laravel 12.
+- Clarified the README quickstart around the published `oxhq/preview` package and
+  removed path-repository install guidance from the public onboarding path.
+- Recorded Laravel 11 and Laravel 12 Packagist smoke commands as the consumer install
+  checks for published releases.
+
+## v0.1.0 - 2026-05-06
+
 - Added the package-local MVP surface for Laravel Preview: provider discovery and doctor commands, local capture endpoints, capture replay/export/test helpers, route preview commands, fixture generation, scenario files, and Pest-compatible generated tests.
 - Added local provider support for generic webhooks, HMAC-signed generic webhooks, Stripe-shaped events, Shopify-shaped events, and GitHub-shaped events.
 - Added local transport checks for configured process tunnels, ngrok, Cloudflare Tunnel, and Stripe CLI forwarding.
@@ -15,5 +26,3 @@ All notable user-facing changes for `oxhq/preview` will be documented here.
 - Added optional Packagist sync automation for release workflows, webhook-mode Packagist visibility waiting, GitHub release asset/checksum verification, and a safer release-prep command that does not create tags unless explicitly requested.
 - Expanded the clean consumer smoke to cover scenario creation, scenario replay, generated scenario tests, and generated capture tests in a disposable Laravel app.
 - Expanded live provider smoke helpers with GitHub ping/push proof modes and Shopify dry-run, CLI trigger, and Admin GraphQL subscription modes.
-
-This unreleased state is package-local. It does not claim Packagist visibility, hosted CI results, live provider delivery, or production webhook proof until those release checks are completed and recorded.

@@ -16,7 +16,7 @@ composer require --dev oxhq/preview
 php artisan vendor:publish --tag=preview-config
 ```
 
-Local readiness summary:
+Check local readiness:
 
 ```bash
 php artisan preview:doctor
@@ -25,23 +25,30 @@ php artisan preview:config
 php artisan preview:config --json
 ```
 
-Before the package is published, install it from a Laravel app through a Composer path repository:
+## Five-minute capture to test
 
-```json
-{
-  "repositories": [
-    {
-      "type": "path",
-      "url": "../preview",
-      "options": {
-        "symlink": true
-      }
-    }
-  ],
-  "require-dev": {
-    "oxhq/preview": "*"
-  }
-}
+Create a synthetic local capture, turn it into a fixture, and generate the Pest-compatible
+test that replays the same request:
+
+```bash
+php artisan preview:capture generic \
+  --path=/preview-packagist-smoke \
+  --header="X-Preview-Event: order.created" \
+  --body='{"id":1}'
+
+php artisan preview:capture:fixture {capture}
+php artisan preview:capture:test {capture}
+```
+
+Replace `{capture}` with the capture ID printed by `preview:capture`. The generated
+fixture is the reusable artifact: it powers replay, generated tests, local scenarios,
+and later CI or cloud replay surfaces.
+
+Published package install checks are covered by the Packagist smoke script:
+
+```bash
+composer smoke:packagist-install -- -Version v0.1.0 -LaravelVersion '^11.0'
+composer smoke:packagist-install -- -Version v0.1.0 -LaravelVersion '^12.0'
 ```
 
 ## What Ships

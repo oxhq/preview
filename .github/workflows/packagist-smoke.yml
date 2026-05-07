@@ -1,0 +1,57 @@
+name: Packagist Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Optional Packagist version to install, for example v0.1.0. Empty installs the latest resolvable release.
+        required: false
+        default: ''
+        type: string
+  schedule:
+    - cron: '17 9 * * 1'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  packagist-install:
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - '8.3'
+          - '8.4'
+        laravel:
+          - '^11.0'
+          - '^12.0'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Run Packagist install smoke
+        shell: powershell
+        run: |
+          $version = ''
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $version = '${{ inputs.version }}'
+          }
+
+          $arguments = @('-LaravelVersion', '${{ matrix.laravel }}')
+
+          if (-not [string]::IsNullOrWhiteSpace($version)) {
+            $arguments = @('-Version', $version) + $arguments
+          }
+
+          ./scripts/smoke-packagist-install.ps1 @arguments
